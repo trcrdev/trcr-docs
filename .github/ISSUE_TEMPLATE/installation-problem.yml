@@ -1,0 +1,64 @@
+name: Installation or configuration problem
+description: Something went wrong installing, configuring or running TRCR.
+labels: [installation]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This issue will be public.** Before you post, remove licence files, anything starting `TRCR-ENROLL-`, passwords, tokens, webhook URLs, and any real IP addresses, hostnames or email addresses you do not want published. Never post anything from `/var/lib/trcr`.
+
+        Please check the [troubleshooting guide](https://github.com/trcrdev/trcr-docs/blob/main/docs/troubleshooting.md) first.
+  - type: dropdown
+    id: area
+    attributes:
+      label: What were you doing?
+      options:
+        - Installing the master or an all-in-one host
+        - Adding an agent
+        - Getting or applying a licence
+        - Writing configuration or probes
+        - Storing results (PostgreSQL, InfluxDB, Elasticsearch, Prometheus)
+        - Setting up dashboards
+        - Upgrading or uninstalling
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TRCR version
+      description: Output of `trcrd version`
+      placeholder: v26.09.03
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and architecture
+      placeholder: Debian 13, amd64
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the exact command you ran, with secrets removed.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output and logs
+      description: |
+        With secrets and real addresses removed:
+        `sudo journalctl -u trcrd-master -n 80 --no-pager` (or `trcrd-agent`), `sudo trcrd agents`, and `sudo trcrd validate --config /etc/trcr/master.yaml`.
+      render: text
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before posting
+      options:
+        - label: I removed licence data, tokens, passwords and any addresses I do not want public.
+          required: true
+        - label: I read the troubleshooting guide.
+          required: false

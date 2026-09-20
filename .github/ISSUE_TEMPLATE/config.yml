@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Account, licence or billing question
+    url: https://github.com/trcrdev/trcr-docs#getting-help
+    about: These need details that should not be public. Email support@trcr.dev instead.
+  - name: Security problem
+    url: https://github.com/trcrdev/trcr-docs/blob/main/docs/security.md#reporting-a-security-problem
+    about: Please do not report security problems in a public issue. Email support@trcr.dev.
+  - name: Troubleshooting guide
+    url: https://github.com/trcrdev/trcr-docs/blob/main/docs/troubleshooting.md
+    about: Most installation problems are one of a handful of causes. Check here first.

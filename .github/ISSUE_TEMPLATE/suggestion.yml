@@ -1,0 +1,10 @@
+name: Suggestion
+description: An idea that would make installing or running TRCR easier.
+labels: [suggestion]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like, and what problem would it solve?
+    validations:
+      required: true

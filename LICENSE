@@ -1,0 +1,36 @@
+TRCR Documentation License
+
+Copyright (c) 2026 TRCR Networks. All rights reserved.
+
+"Documentation" means the text, examples and images in this repository.
+"TRCR" means the TRCR network monitoring software and services provided by
+TRCR Networks.
+
+1. You may read, copy and print the Documentation, and adapt its examples, to
+   evaluate, install and operate TRCR inside your own organisation or for a
+   customer whose TRCR deployment you operate.
+
+2. You may quote short passages when writing about TRCR, provided you credit
+   TRCR Networks and link to the source.
+
+3. Without written permission from TRCR Networks you may not republish the
+   Documentation, in whole or in substantial part, modified or not; sell it;
+   or use it to document or promote a product or service that competes with
+   TRCR. A fork on the same hosting service made to propose changes back to
+   this repository is allowed.
+
+4. If you send a change to this repository, you grant TRCR Networks a
+   perpetual, worldwide, royalty-free, irrevocable right to use, modify and
+   distribute it under any terms, and you confirm you have the right to grant
+   that.
+
+5. This license gives you no right to use the TRCR name or logo, except to
+   state accurately what the Documentation describes. The TRCR software is
+   licensed separately under its own agreement.
+
+6. THE DOCUMENTATION IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING ACCURACY, MERCHANTABILITY AND FITNESS FOR A
+   PARTICULAR PURPOSE. IN NO EVENT SHALL TRCR NETWORKS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR OTHER LIABILITY ARISING FROM THE DOCUMENTATION OR ITS USE.
+
+Questions and permission requests: support@trcr.dev
