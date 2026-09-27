@@ -1,0 +1,58 @@
+# Podman quadlet: the TRCR master.
+#
+# Install as root (rootful Podman):
+#   /etc/containers/systemd/trcr-master.container   (this file)
+#   /etc/containers/systemd/trcr.network, trcr-master-state.volume
+#   /etc/trcr/            config dir, chown 65532:65532 (the image's user)
+#   /etc/trcr/master.env  TRCR_PG_PASSWORD=… and POSTGRES_PASSWORD=… (0600)
+# then `systemctl daemon-reload && systemctl start trcr-master`.
+#
+# Before the first start, create the config and the licence with one-shot
+# runs of the same image (see docs/containers.md):
+#   podman run --rm --hostname trcr-master -v /etc/trcr:/etc/trcr:Z \
+#       ghcr.io/trcrdev/trcrd:latest init --advertise-addr HOST:8444 \
+#       --health-listen-addr 127.0.0.1:8081 ...
+#   podman run --rm --hostname trcr-master -v /etc/trcr:/etc/trcr:Z \
+#       ghcr.io/trcrdev/trcrd:latest license request --email … --company … --yes --wait
+#
+# HostName is pinned: the licence is bound to a machine fingerprint that is
+# derived from the hostname inside a container.
+[Unit]
+Description=TRCR master
+Requires=trcr-results-pg.service
+After=trcr-results-pg.service
+
+[Container]
+Image=ghcr.io/trcrdev/trcrd:latest
+ContainerName=trcr-master
+HostName=trcr-master
+Exec=master --config /etc/trcr/master.yaml
+Network=trcr.network
+PublishPort=8443:8443
+PublishPort=8444:8444
+PublishPort=127.0.0.1:9101:9101
+EnvironmentFile=/etc/trcr/master.env
+Volume=/etc/trcr:/etc/trcr:Z
+Volume=trcr-master-state.volume:/var/lib/trcr
+DropCapability=ALL
+# ping, batch_ping and traceroute open raw sockets. Remove if the master
+# runs only TCP / HTTP / DNS / SSL probes.
+AddCapability=NET_RAW
+NoNewPrivileges=true
+# Needs master.health_listen_addr: 127.0.0.1:8081 in master.yaml
+# (trcrd init --health-listen-addr 127.0.0.1:8081 writes it).
+HealthCmd=curl -fsS http://127.0.0.1:8081/healthz
+HealthInterval=30s
+HealthTimeout=5s
+HealthRetries=3
+HealthStartPeriod=15s
+# Restart the container when the health check fails (Podman 4.3+).
+HealthOnFailure=kill
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target default.target

@@ -15,6 +15,7 @@ These pages cover installing, configuring and running TRCR. They apply to
 | Understand the parts and plan a deployment | [Getting started](docs/getting-started.md) |
 | Avoid the usual mistakes | [Checklist for a successful installation](docs/checklist.md) |
 | Install TRCR | [Installation](docs/install.md) |
+| Run it in Docker or Podman | [Containers](docs/containers.md) |
 | Get or renew a licence | [Licensing](docs/licensing.md) |
 | Add, move or retire agents | [Agents](docs/agents.md) |
 

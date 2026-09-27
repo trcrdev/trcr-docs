@@ -1,0 +1,3 @@
+# Podman quadlet: PostgreSQL data for the results store.
+[Volume]
+VolumeName=trcr-results-pg-data

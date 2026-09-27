@@ -17,6 +17,7 @@ Pick the install that matches what you want.
 | One host that does everything, with a database and dashboards | [All-in-one](#all-in-one-recommended-for-a-first-install) |
 | A master that writes to a database you already run | [Master with your own database](#master-with-your-own-database) |
 | Another host to measure from | [An agent](agents.md) |
+| Docker or Podman instead of a host install | [Containers](containers.md) |
 
 ## What the installer does
 

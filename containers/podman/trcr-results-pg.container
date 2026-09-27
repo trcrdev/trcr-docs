@@ -1,0 +1,27 @@
+# Podman quadlet: PostgreSQL results store for a single-host TRCR install.
+# Skip this unit and point master.yaml at your own database if you have one.
+#
+# Reads POSTGRES_PASSWORD from /etc/trcr/master.env, the same file the master
+# reads TRCR_PG_PASSWORD from (see trcr-master.container).
+[Unit]
+Description=TRCR results store (PostgreSQL)
+
+[Container]
+Image=docker.io/library/postgres:18-trixie
+ContainerName=trcr-results-pg
+Network=trcr.network
+Environment=POSTGRES_USER=trcr
+Environment=POSTGRES_DB=trcr_results
+EnvironmentFile=/etc/trcr/master.env
+Volume=trcr-results-pg-data.volume:/var/lib/postgresql
+HealthCmd=pg_isready -U trcr -d trcr_results
+HealthInterval=10s
+HealthTimeout=5s
+HealthRetries=5
+HealthStartPeriod=5s
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target default.target

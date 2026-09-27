@@ -1,0 +1,3 @@
+# Podman quadlet: the agent's identity and state.
+[Volume]
+VolumeName=trcr-agent-state

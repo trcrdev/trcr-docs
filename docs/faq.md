@@ -41,6 +41,15 @@ No. It coordinates and forwards results. Size the host by your database, which
 does the heavy work. A small virtual machine runs an all-in-one install for a
 small deployment.
 
+### Can I run TRCR in Docker or Podman?
+
+Yes. The image is `ghcr.io/trcrdev/trcrd`, for amd64 and arm64 Linux. A Compose
+file and Podman quadlet units are in this repository; see
+[Containers](containers.md). Agents run with the `NET_RAW` capability on the
+host network so ping and traceroute measure the host's real path, and the
+master's container hostname is pinned because the licence is bound to a
+fingerprint derived from it.
+
 ## Agents
 
 **How many agents can I have?**

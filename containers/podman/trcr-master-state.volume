@@ -1,0 +1,3 @@
+# Podman quadlet: the master's state: its CA, its database and licence renewals.
+[Volume]
+VolumeName=trcr-master-state

@@ -1,0 +1,3 @@
+# Podman quadlet: the agent's config (agent.yaml, written at first start).
+[Volume]
+VolumeName=trcr-agent-etc

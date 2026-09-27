@@ -1,0 +1,4 @@
+# Podman quadlet: the bridge network the master and the results database
+# share. Agents use the host network instead (see trcr-agent.container).
+[Network]
+NetworkName=trcr

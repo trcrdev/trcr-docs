@@ -1,0 +1,167 @@
+# TRCR — Compose stack for Docker Compose v2 and Podman Compose.
+#
+# One master, one agent and a PostgreSQL results store on a single host.
+# The walk-through is docs/containers.md in this repository; the short
+# version is below. Image: ghcr.io/trcrdev/trcrd. Pin a release with
+# TRCR_IMAGE=ghcr.io/trcrdev/trcrd:<release> in .env.
+#
+#   1. Config directory, owned by the image's unprivileged user (uid 65532).
+#      The master writes its licence there, so it is not read-only.
+#
+#        mkdir -p etc && sudo chown 65532:65532 etc
+#        echo "TRCR_PG_PASSWORD=$(openssl rand -hex 16)" > .env
+#
+#   2. Starter master config. --advertise-addr is the address AGENTS dial,
+#      so it must be this host as agents see it, not the container.
+#
+#        docker compose run --rm trcr-master init \
+#            --advertise-addr trcr-master.example.com:8444 \
+#            --health-listen-addr 127.0.0.1:8081 \
+#            --postgres-dsn 'postgres://trcr@trcr-results-pg:5432/trcr_results?sslmode=disable' \
+#            --postgres-password-env TRCR_PG_PASSWORD
+#
+#   3. Licence (free tier, self-serve). --wait blocks until the emailed
+#      verification link is clicked, then installs /etc/trcr/license.lic.
+#      Holding a licence file already? Copy it to etc/license.lic instead.
+#
+#        docker compose run --rm trcr-master license request \
+#            --email you@example.com --company "Your Co" --yes --wait
+#
+#   4. docker compose up -d trcr-results-pg trcr-master
+#
+#   5. An enrolment token and CA hash for the agent (valid one hour):
+#
+#        docker compose exec trcr-master trcrd enroll-agent
+#
+#      Put the --token value in TRCR_ENROLL_TOKEN and the --ca-hash value
+#      in TRCR_CA_HASH in .env, then:
+#
+#        docker compose up -d trcr-agent-1
+#
+#      The agent enrols on its first start and keeps its identity in its
+#      state volume, so restarts do not re-enrol.
+#
+#   6. docker compose exec trcr-master trcrd agents      # the agent shows up
+#
+# Notes:
+#
+#   * hostname: is pinned on the master. The licence is bound to a machine
+#     fingerprint that is derived from the hostname inside a container, so
+#     a random container ID would change it on every recreate.
+#   * NET_RAW is what ping, batch ping and traceroute need. The master runs
+#     probes too, so both services have it. Drop it from a service that
+#     only runs TCP, HTTP, DNS or SSL probes.
+#   * The agent uses host networking so its measurements come from the
+#     host's own interfaces and traceroute sees real hops rather than the
+#     Compose bridge. To use the bridge instead, remove network_mode, add
+#     `networks: [trcr_net]`, and set TRCR_JOIN=trcr-master:8444.
+#   * :Z on the bind mounts is for SELinux hosts (Podman on Fedora, RHEL).
+#     Docker ignores it where SELinux is not enforcing.
+#   * Rootless Podman: ping works, traceroute does not (the user-mode
+#     network stack does not return TTL-exceeded replies). Run agents that
+#     traceroute as root, or install the agent on the host instead.
+
+services:
+  # -------------------------------------------------------------------------
+  # Master — holds the CA, schedules probes, collects results.
+  # -------------------------------------------------------------------------
+  trcr-master:
+    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:latest}
+    container_name: trcr-master
+    hostname: trcr-master
+    restart: unless-stopped
+    command: ["master", "--config", "/etc/trcr/master.yaml"]
+    depends_on:
+      trcr-results-pg:
+        condition: service_healthy
+    environment:
+      # Read by the postgres backend (backends[].password_env), so the
+      # credential never sits in master.yaml.
+      TRCR_PG_PASSWORD: ${TRCR_PG_PASSWORD:?set TRCR_PG_PASSWORD in .env}
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./etc:/etc/trcr:Z
+      - trcr_master_state:/var/lib/trcr
+    ports:
+      - "8443:8443"            # mTLS API (agents POST results, GET probe config)
+      - "8444:8444"            # enrolment listener (token bootstrap)
+      - "127.0.0.1:9101:9101"  # Prometheus /metrics, loopback only
+    networks:
+      - trcr_net
+    healthcheck:
+      # Needs master.health_listen_addr: 127.0.0.1:8081 in master.yaml,
+      # which the --health-listen-addr flag in step 2 writes.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # -------------------------------------------------------------------------
+  # Agent — measures from this host. Enrols itself on first start.
+  # -------------------------------------------------------------------------
+  trcr-agent-1:
+    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:latest}
+    container_name: trcr-agent-1
+    hostname: trcr-agent-1
+    restart: unless-stopped
+    command: ["agent", "--config", "/etc/trcr/agent.yaml"]
+    depends_on:
+      trcr-master:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      TRCR_JOIN: ${TRCR_JOIN:-127.0.0.1:8444}
+      TRCR_ENROLL_TOKEN: ${TRCR_ENROLL_TOKEN:-}
+      TRCR_CA_HASH: ${TRCR_CA_HASH:-}
+      TRCR_NODE_ID: trcr-agent-1
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      # Its own config and state; the entrypoint writes agent.yaml on the
+      # first start, after enrolment.
+      - trcr_agent_1_etc:/etc/trcr
+      - trcr_agent_1_state:/var/lib/trcr
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/trcrd", "version"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL results store. Point master.yaml at an existing Postgres,
+  # Elasticsearch or InfluxDB instead if you have one.
+  # -------------------------------------------------------------------------
+  trcr-results-pg:
+    image: postgres:18-trixie
+    container_name: trcr-results-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trcr
+      POSTGRES_PASSWORD: ${TRCR_PG_PASSWORD:?set TRCR_PG_PASSWORD in .env}
+      POSTGRES_DB: trcr_results
+    volumes:
+      - trcr_results_pg_data:/var/lib/postgresql
+    networks:
+      - trcr_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trcr -d trcr_results"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+networks:
+  trcr_net:
+    driver: bridge
+
+volumes:
+  trcr_master_state:
+  trcr_agent_1_etc:
+  trcr_agent_1_state:
+  trcr_results_pg_data:
