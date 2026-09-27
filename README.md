@@ -6,7 +6,7 @@ throughput and device health from several places at once, and stores the
 results in a database you control.
 
 These pages cover installing, configuring and running TRCR. They apply to
-**TRCR v26.09.03**.
+**TRCR v26.9.4**.
 
 ## Start here
 
