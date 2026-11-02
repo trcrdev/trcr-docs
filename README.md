@@ -1,9 +1,19 @@
 # TRCR documentation
 
-[TRCR](https://trcr.dev) is network monitoring software you install on your own
-hosts. It measures reachability, latency, DNS, TLS certificates, routing,
-throughput and device health from several places at once, and stores the
-results in a database you control.
+[TRCR](https://trcr.dev) is a self-hosted network testing and monitoring daemon
+published by NameVerse, Inc. (Palo Alto, California). A master and a full mesh
+of agents, configured by one YAML file, run 14 probe types: ping, batch ping,
+TCP, traceroute, liveness sweep, NTP, path MTU, HTTP/HTTPS, SSL expiry, DNS, DNS
+propagation, native throughput, SNMP and BGP. Results go to your own
+PostgreSQL, InfluxDB, Elasticsearch or Prometheus and never leave your
+infrastructure; trcr.dev receives only the optional hourly licence heartbeat.
+
+**Live demo:** [demo.trcr.dev](https://demo.trcr.dev), an anonymous, read-only
+Grafana fed by a real TRCR mesh.
+
+**Not to be confused with:** TRCR (trcr.dev) is network monitoring software. It
+is not the TRCR carbon-credit token, the `traceroute` command or the trcr.pro
+time-tracking app.
 
 These pages cover installing, configuring and running TRCR. They apply to
 **TRCR v26.9.4**.
