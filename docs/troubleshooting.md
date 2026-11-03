@@ -280,11 +280,14 @@ sudo /etc/trcr/finish-setup.sh
 
 A master can be running without saving anything. If it can't open your
 results store, it starts anyway and logs that every result will be DISCARDED.
-To check, search the log:
+To check, search the log back to the master's latest start, so a problem from
+before a restart doesn't show up again:
 
 ```bash
-sudo journalctl -u trcrd-master | grep -iE "discard|backend"
+sudo journalctl -u trcrd-master -r | sed '/master ready/q' | grep -iE "discard|backend"
 ```
+
+`backend ready` means a store opened; `DISCARDED` means none did.
 
 On an all-in-one host, `finish-setup.sh` waits up to 90 seconds for the first
 results, and stops waiting about ten seconds after the first row arrives. If

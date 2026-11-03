@@ -82,7 +82,8 @@ dashboards, and come back here before you rely on the data.
 - [ ] `sudo trcrd agents` shows every agent as `up`.
 - [ ] `sudo trcrd probes` shows your probes and where each one runs.
 - [ ] The master's log has no line saying results are DISCARDED:
-      `sudo journalctl -u trcrd-master | grep -i discard` prints nothing. Read
+      `sudo journalctl -u trcrd-master -r | sed '/master ready/q' | grep -i discard`
+      prints nothing. It reads back to the master's latest start. Read
       any `WARN` or `ERROR` line; on a healthy master there are almost none.
       See [what a healthy log looks like](operations.md#what-a-healthy-master-log-looks-like).
 - [ ] `sudo trcrd license status` shows `last heartbeat:` with `ok`, unless

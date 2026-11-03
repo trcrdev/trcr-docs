@@ -689,10 +689,11 @@ trcrd run ping 1.1.1.1
 
 A master can be running without saving anything. If it can't open your
 results store, it starts anyway and logs that results are being discarded. To
-check, search the log:
+check, search the log back to the master's latest start, so a problem you've
+already fixed and restarted from doesn't show up again:
 
 ```bash
-sudo journalctl -u trcrd-master | grep -i discard
+sudo journalctl -u trcrd-master -r | sed '/master ready/q' | grep -i discard
 ```
 
 No output means nothing is being thrown away. `finish-setup.sh` runs this check
