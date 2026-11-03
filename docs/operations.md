@@ -232,7 +232,8 @@ results saved since the restarted master started, so it shows the new version
 is writing. The sample probes line appears only when the samples changed.
 Grafana is restarted only if its TRCR settings or dashboards changed, and the
 line says which, for example
-`Restarting Grafana so it loads the new settings ...`. An upgrade doesn't
+`Restarting Grafana so it loads the new settings (this can take a minute) ...`.
+An upgrade doesn't
 print a new join command; it says
 `To add another host, run this here on the master and paste the command it prints on that host:`
 and points at `sudo trcrd enroll-agent`.
@@ -245,11 +246,18 @@ the restart:
 ==> Added /etc/systemd/system/trcrd-master.service.d/10-trcr.conf so the kept service file reads /etc/trcr/master.env.
 ```
 
+In a kept service file that still links to an old documentation address, the
+installer points the `Documentation=` line at these docs. It changes nothing
+else in the file and doesn't mention it on screen.
+
 You may see `tightened directory permissions` once in the master's log after
 that restart; see [What a healthy master log looks like](#what-a-healthy-master-log-looks-like).
 
-On each **agent**, run the plain command. The installer sees that the host is
-an agent and upgrades it, without writing any master configuration:
+On each **agent**, run the plain command, the one the installer printed after
+the join (`To upgrade this agent later, run: ...`). The installer sees that
+the host is an agent and upgrades it, without writing any master
+configuration. Running the join command again only says the host is already
+enrolled.
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh
@@ -343,12 +351,26 @@ That retires the agent's credentials. Without `--purge`,
 `/etc/trcr/agent.yaml` is kept, but running the installer again on the host
 says
 `This host was an agent (web-02) and has left its master, so it needs a new enrollment.`
-To make it an agent again, run `sudo trcrd enroll-agent` on the master and
-paste the command it prints on the host.
+and exits with status 1. To make it an agent again, run
+`sudo trcrd enroll-agent` on the master and paste the command it prints on
+the host.
+
+The uninstaller's summary says `Re-running install.sh restores this deployment.`
+only where that's true: on a master or an all-in-one host, and on an agent
+that keeps its identity. Uninstalling an agent that has already left its
+master says instead:
+
+```
+  Config and state are KEPT (/etc/trcr, /var/lib/trcr).
+  This agent has already left its master. To make this host an agent
+  again, run sudo trcrd enroll-agent on the master and paste the command
+  it prints here. Use --purge to delete them.
+```
 
 To keep the agent's identity instead, add `--skip-leave`. The master then
-keeps the agent's record and shows it as down. Run the plain install command
-on the host again, and the agent comes back as it was:
+keeps the agent's record and shows it as down after about 90 seconds. Run
+the plain install command on the host again, and the agent comes back as it
+was:
 
 ```
 ==> This host is an agent (enrolled as web-02), but its service was removed. Putting it back ...
@@ -366,13 +388,34 @@ warning: trcrd is not installed, so this host cannot tell the master it is leavi
 ```
 
 On an all-in-one host, the uninstaller removes the TRCR dashboards and data
-source from Grafana. It leaves the PostgreSQL and Grafana packages, and your
-results database, in place. Grafana keeps listening on 127.0.0.1 only, with
-sign-up and anonymous access off, unless you installed with `--open-grafana`.
-At the end, the uninstaller prints the two `psql` commands that delete the
-results database and its user, in case you want them gone too. On a host
-without `sudo`, they start with `runuser -u postgres --` instead of
+source from Grafana. It restarts Grafana for that, which can take a while:
+
+```
+    Restarting Grafana so it drops the TRCR data source (this can take a minute) ...
+    removed /etc/grafana/provisioning/datasources/trcr.yaml
+    removed the empty TRCR folder from Grafana
+```
+
+Once nothing is left in the TRCR folder, the folder goes too. If you saved a
+dashboard of your own there, the folder and that dashboard stay. The
+uninstaller leaves the PostgreSQL and Grafana packages, and your results
+database, in place. Grafana keeps listening on 127.0.0.1 only, with sign-up
+and anonymous access off, unless you installed with `--open-grafana`. At the
+end, the uninstaller prints the two `psql` commands that delete the results
+database and its user, in case you want them gone too. On a host without
+`sudo`, they start with `runuser -u postgres --` instead of
 `sudo -u postgres`.
+
+On a master that uses your own PostgreSQL (`--postgres-dsn`), the uninstaller
+leaves that database alone as well, with or without `--purge`. If the
+database is on the same host, it prints the same two `psql` commands, with
+your database and user names. If it's on another host, there's nothing to
+run here, so it only names it:
+
+```
+==> The PostgreSQL results database was left untouched.
+    Results remain in trcr_results on db.example.com:5432; drop it there if you no longer need it.
+```
 
 `--purge` also deletes `/etc/trcr`, `/var/lib/trcr`, the TRCR logs
 (`/var/log/trcr` and `/var/log/trcr-install.log`) and the `trcr` user. On an
