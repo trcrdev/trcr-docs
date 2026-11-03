@@ -52,7 +52,8 @@ two commands to run later.
 ## What you'll see
 
 Installing the Grafana package is the slow part. It can take a few minutes, and
-the installer says so before it starts. You'll see something like this
+the installer says so before it starts. Grafana's first start can take another
+minute or two, and the installer says so too. You'll see something like this
 (shortened):
 
 ```
@@ -64,6 +65,8 @@ the installer says so before it starts. You'll see something like this
 ...
 ==> Added 7 starter probes so you see data straight away (/etc/trcr/conf.d/standalone.yaml).
 ==> Installing Grafana and the TRCR dashboards (apt-get). The Grafana package is large, so this can take a few minutes.
+...
+==> Starting Grafana (its first start can take a minute or two) ...
 ...
 ==> Requesting your free license for you@example.com ...
 ...
@@ -93,6 +96,10 @@ Three things matter:
   block lists only PostgreSQL and the probes. The password is on the
   `Grafana:` line a little higher up, just before the command for adding
   another host. Copy it now. It's also kept in `/etc/trcr/grafana-admin.env`.
+
+On a small host, Grafana may still be starting when the install ends. The
+installer then says `Grafana is still starting; it will be ready in a minute or two.`
+Give it that long before you open it.
 
 Where the `ssh -L` command says `<this-host>`, put in the name or address you
 use to reach the host over SSH. The summary fills in the host's own address
@@ -245,7 +252,10 @@ On the agent, you'll see:
 
 ```
 ==> Enrolling with the master at 192.0.2.10:8444 ...
+...
 ==> This host is enrolled and the agent is running. Nothing else to do here.
+...
+    To upgrade this agent later, run:  curl -fsSL https://trcr.dev/install/install.sh | sh
 ```
 
 To check, run `sudo trcrd agents` on the **master**. The new agent should show
@@ -421,7 +431,12 @@ left. Here they are with the reason for each:
 
    This starts the master, enrolls a local agent and prints the command for
    adding more agents. Without `psql` on the host, a working connection shows
-   as `The master opened your PostgreSQL database; results are going there.`
+   as:
+
+   ```
+       The master opened your PostgreSQL database; results are going there.
+       (psql is not installed on this host, so the first rows were not looked at.)
+   ```
 
    If the master can't reach the database, the step ends with `The master is
    running, but it is not saving results anywhere, so they are being thrown
@@ -430,8 +445,8 @@ left. Here they are with the reason for each:
 
    ```
        Fix the database, or the sslmode/host in the dsn: line of /etc/trcr/master.yaml (a database without TLS needs sslmode=disable), then:
-       (Or run the installer again with the corrected --postgres-dsn; it updates that line and restarts the master.)
          sudo systemctl restart trcrd-master && sudo /etc/trcr/finish-setup.sh
+       (Or run the installer again with the corrected --postgres-dsn; it updates that line and restarts the master.)
        The full log: sudo journalctl -u trcrd-master -n 30
    ```
 
