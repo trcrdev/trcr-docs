@@ -393,6 +393,14 @@ was:
 ==> The agent is running again. Nothing else to do here.
 ```
 
+With `--skip-leave --purge`, the master isn't told and the identity is
+deleted, so the master keeps a record that nothing can bring back. The
+uninstaller warns you and names the command to run on the master:
+
+```
+warning: with --skip-leave this host does not tell the master it is leaving, and --purge deletes its identity. On the master run: sudo trcrd agents remove web-02 --yes
+```
+
 If the master can't be reached during the leave step, nothing is retired and
 the uninstall still finishes. It tells you to run
 `sudo trcrd agents remove web-02 --yes` on the master. If `trcrd` was already
@@ -434,9 +442,17 @@ run here, so it only names it:
 
 `--purge` also deletes `/etc/trcr`, `/var/lib/trcr`, the TRCR logs
 (`/var/log/trcr` and `/var/log/trcr-install.log`) and the `trcr` user. On an
-all-in-one host, nothing keeps a copy of Grafana's admin password after that,
-so the closing note shows the command that sets a new one. Grafana's other
-TRCR settings stay, so it still listens only where it did before.
+all-in-one host, Grafana's admin password still works, but the copies TRCR
+kept are gone. The closing note says so and shows the command that sets a
+new one:
+
+```
+    Its admin password is unchanged, but the copy TRCR kept went with /etc/trcr and the install log.
+    If you no longer have it, set a new one (read from stdin, never on the command line):
+```
+
+Grafana's other TRCR settings stay, so it still listens only where it did
+before.
 
 > **Warning:** Before you purge a master, copy `/etc/trcr/license.lic`
 > somewhere safe. `--purge` deletes `/var/lib/trcr`, which holds your
