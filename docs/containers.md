@@ -99,6 +99,13 @@ enroll again. Everything under `etc/` belongs to uid 65532, the user the
 daemon runs as, and is yours to edit; reference copies of every
 configuration file are in `etc/examples/`.
 
+`trcr-init` runs again on every `up` and every start of the stack, and does
+only what's missing. When nothing is, it prints a single line:
+
+```
+trcr-init: already set up; nothing to do.
+```
+
 ## Add an agent on another host
 
 On the **master**, create the agent's token and CA hash:
@@ -154,6 +161,11 @@ nothing, so use `stop` and then `start` (`sudo podman-compose stop
 trcr-master && sudo podman-compose start trcr-master`). There is no `rm`;
 "An agent that never came up" below shows what to run instead.
 
+One `sudo podman-compose up -d` runs `trcr-init` several times, once for each
+service that depends on it; that's how podman-compose starts dependencies.
+The first run does the setup, and each later one prints only
+`trcr-init: already set up; nothing to do.`
+
 ### With quadlets
 
 Quadlet turns `.container`, `.network` and `.volume` files under
@@ -192,7 +204,8 @@ sudo systemctl start trcr-master trcr-agent trcr-grafana
 healthy and the agent is running; the setup and enrollment units run first
 on their own. There is nothing to `enable`: the units start at boot through
 their `[Install]` sections, and the one-shot units run again at every boot
-and find nothing left to do. Check the same way as with Compose:
+and find nothing left to do (`trcr-init: already set up; nothing to do.` in
+the journal). Check the same way as with Compose:
 
 ```bash
 sudo podman exec trcr-master trcrd agents
@@ -321,8 +334,12 @@ and run `docker compose up -d`; with quadlets, change the `Image=` line in
 the `trcr-*.container` files, then `sudo systemctl daemon-reload` and
 `sudo systemctl restart trcr-init trcr-master trcr-enroll trcr-agent`.
 Configuration, state and license live in `etc/` and the volumes, so a new
-image picks them up as they are, and the setup job refreshes the Grafana
-dashboards to the ones shipped with that release.
+image picks them up as they are. The setup job refreshes the Grafana
+dashboards to the ones shipped with that release, and the probe samples too:
+
+```
+trcr-init: refreshed /etc/trcr/conf.d/_samples.yaml (probe samples for this release)
+```
 
 **Checking.** The master's CLI works through `exec` as it does on a host:
 
@@ -341,7 +358,8 @@ trcr-master`; where it says `journalctl -u trcrd-agent`, use
 
 **Removing everything.** `docker compose down -v` stops the containers and
 deletes the volumes, including the master's CA and the results. `etc/` on
-the host stays; keep `etc/license.lic` if you plan to start again.
+the host stays. To start from scratch, remove `etc/` as well, after keeping a
+copy of `etc/license.lic`.
 
 With quadlets, stop every `trcr-` unit, including the volume and network
 units Quadlet generated so that a later install creates the volumes again,
@@ -356,8 +374,10 @@ sudo podman volume rm trcr-master-state trcr-agent-etc trcr-agent-state trcr-res
 sudo podman network rm trcr
 ```
 
-On a remote agent, remove just the two `trcr-agent-*` volumes; there is no
-network. `/etc/trcr` and `/etc/trcr-container` stay, with your license.
+`/etc/trcr` and `/etc/trcr-container` stay, with your license. To start from
+scratch, also remove `/etc/trcr`; the setup job writes it again from what's
+in `/etc/trcr-container`. On a remote agent, remove just the two
+`trcr-agent-*` volumes; there is no network.
 
 ## macOS and Docker Desktop
 
