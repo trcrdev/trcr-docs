@@ -74,6 +74,15 @@ follows the same three steps:
 2. Check it: `sudo trcrd validate --config /etc/trcr/master.yaml`
 3. Apply it: `sudo systemctl restart trcrd-master`
 
+`validate` lists every problem it finds, then ends with
+`trcrd validate: N problem(s); the master would not run correctly` and exit
+status 1. When there's nothing wrong, it prints `config OK: …`, and
+`license OK: …` if a license file is installed. It adds
+`Restart the master to apply changes: sudo systemctl restart trcrd-master`
+only when a file changed after the running master started. See
+[Configuration](configuration.md#check-before-you-restart) for what each line
+means.
+
 Agents fetch the new probes within a minute and apply them without restarting.
 
 Keep `/etc/trcr` in version control if you can. Leave the license file and any
@@ -90,23 +99,27 @@ sudo journalctl -u trcrd-master -n 50
 When the master starts, look for these messages, in roughly this order:
 
 - `license loaded`
-- `backend ready`, once for each results store that opened
-- `master ready`
+- `master ready`. Agents can connect from this moment.
+- `backend ready`, once for each results store that opened. A store can take a
+  few seconds to open after `master ready`. Results that arrive in the
+  meantime are held and handed over, not lost.
 
 After that, you'll see `agent enrolled` when an agent joins, and
 `received probe results` as agents report in.
 
-Most lines are at level `INFO`. Lines at `WARN` or `ERROR` are worth reading.
-The ones you're most likely to meet:
+On a healthy master, nearly every line is at level `INFO`. A `WARN` or `ERROR`
+line means something needs a look, and most of them say what to do. The ones
+you're most likely to meet:
 
 | Message | What it means |
 |---|---|
 | `every probe result will be DISCARDED` (ERROR) | No results store could be opened, so nothing is being saved. The lines just before it say why. See [Troubleshooting](troubleshooting.md#the-master-is-running-but-theres-no-data). |
+| `backend validation failed; skipping` (ERROR) | One results store wasn't started. The `err` field says why. If its password variable isn't set, the `fix` field says where to put it. See [Troubleshooting](troubleshooting.md#a-results-stores-password-doesnt-reach-the-master). |
 | `some backends were skipped` (WARN) | One of several results stores didn't open. The others are still saving. |
 | `master.advertise_addr is not set` (WARN) | Agents on other hosts will enroll and then fail. See [Configuration](configuration.md#advertise_addr-is-required-for-remote-agents). |
 | `tightened directory permissions (world bits removed)` (WARN) | The master found one of its folders readable by every user and fixed it. You'll see it once; there's nothing to do. |
 | `heartbeat send failed` (WARN) | The master couldn't check in with `api.trcr.dev`. Monitoring carries on, and the master keeps trying. |
-| `heartbeat: the TRCR API is refusing this license` (ERROR) | See [Licensing](licensing.md#the-masters-log-says-the-trcr-api-is-refusing-the-license). Monitoring carries on. |
+| `heartbeat: the TRCR API is refusing this license` (ERROR) | Three check-ins in a row were refused. Monitoring carries on. `sudo trcrd license status` shows the latest outcome. See [Licensing](licensing.md#the-masters-log-says-the-trcr-api-is-refusing-the-license). |
 | `license renewed via heartbeat; restart to apply` (INFO) | A renewed license is waiting. Restart the master when it suits you. |
 
 For more detail, set `log.level: debug` in `master.yaml`, restart the master,
@@ -174,36 +187,71 @@ Agents hold nothing that can't be recreated. If you lose one, enroll it again.
 
 ## Upgrade TRCR
 
-To upgrade, run the installer again. It replaces `trcrd`, refreshes
-`/etc/trcr/examples/`, and leaves your configuration, license and data alone.
-If the version changed, it restarts the TRCR services that were running, so
-they run the new version.
+To upgrade, run the install command again on each host. It replaces `trcrd`,
+refreshes `/etc/trcr/examples/` and the sample probes, and restarts the TRCR
+services that were running, so they run the new version. Your configuration,
+license and data are left alone, and there's nothing to restart by hand.
 
-On the **master**, run:
-
-```bash
-curl -fsSL https://trcr.dev/install/install.sh | sh
-```
-
-On an all-in-one host, add `--all-in-one`. That also brings the TRCR
-dashboards up to date:
+On the **master**, use the options you installed with. On an all-in-one host,
+that's `--all-in-one`, which also brings the TRCR dashboards up to date:
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh -s -- --all-in-one
 ```
 
-On each **agent**, upgrade the binary only:
+You can leave out `--email`, `--company` and `--license`; once a license is
+installed, the installer uses it. A master you set up with no options takes the
+plain command:
 
 ```bash
-curl -fsSL https://trcr.dev/install/install.sh | TRCR_SKIP_SETUP=1 sh
+curl -fsSL https://trcr.dev/install/install.sh | sh
 ```
 
-For each service it restarts, the installer prints
-`Restarting trcrd-master so it runs the new version ...` (or `trcrd-agent`).
-On an agent, it ends with a line like
-`Upgrade complete: trcrd-agent is running v26.11.0.` If `trcrd` was already up
-to date, it says `trcrd v26.11.0 is already installed and up to date.` and
-restarts nothing.
+The master is restarted first. Once it's listening again, the local agent is
+restarted, and only then does the installer check that everything works. On an
+all-in-one host you'll see something like this:
+
+```
+==> Upgrading trcrd from v26.10.0 to v26.11.0 ...
+==> Installed /usr/local/bin/trcrd (trcrd v26.11.0)
+==> Restarting trcrd-master so it runs the new version ...
+==> Restarting trcrd-agent so it runs the new version ...
+...
+==> Refreshed the sample probes in conf.d/_samples.yaml.
+...
+==> Waiting for the first results (up to 90 seconds) ...
+    Data is flowing: ping http dns tcp ssl_expiry traceroute alive
+...
+==> Upgrade complete: trcrd-master and trcrd-agent are running v26.11.0.
+```
+
+When you see `Upgrade complete`, you're done. The sample probes line appears
+only when the samples changed. Grafana is restarted only if its TRCR settings
+changed.
+
+On each **agent**, run the plain command. The installer sees that the host is
+an agent and upgrades it, without writing any master configuration:
+
+```bash
+curl -fsSL https://trcr.dev/install/install.sh | sh
+```
+
+You'll see:
+
+```
+==> Upgrading trcrd from v26.10.0 to v26.11.0 ...
+==> Installed /usr/local/bin/trcrd (trcrd v26.11.0)
+==> Restarting trcrd-agent so it runs the new version ...
+==> Upgrade complete: trcrd-agent is running v26.11.0.
+    To check: sudo systemctl status trcrd-agent
+```
+
+If `trcrd` was already up to date, the installer says
+`trcrd v26.11.0 is already installed and up to date.` and restarts nothing. On
+an agent, it adds `This host is an agent (enrolled as <name>); nothing else to do here.`
+
+Every run is logged in `/var/log/trcr-install.log`, including the checks that
+`finish-setup.sh` makes on the master.
 
 After upgrading:
 
@@ -240,8 +288,9 @@ your results database, in place.
 > certificate stops working, and you'll have to enroll each agent again
 > against a rebuilt master.
 
-Other options: `--yes` skips the questions, `--skip-leave` doesn't contact the
-master, and `--keep-binary` leaves `trcrd` installed. If the master can't be
+Other options: `--yes` skips the questions, and you need it when there's no
+terminal to answer them on. `--skip-leave` doesn't contact the master, and
+`--keep-binary` leaves `trcrd` installed. If the master can't be
 reached during the leave step, the uninstall still finishes and tells you to
 run `sudo trcrd agents remove <name>` on the master.
 
