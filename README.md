@@ -11,7 +11,7 @@ thing trcr.dev receives is the master's hourly license check-in, which you can
 turn off.
 
 These pages cover installing, configuring and running TRCR. They apply to
-TRCR v26.9.4.
+TRCR v26.11.0.
 
 ## Start here
 
