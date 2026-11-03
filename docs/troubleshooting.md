@@ -112,12 +112,12 @@ says:
 
 ```
     Fix the database, or the sslmode/host in the dsn: line of /etc/trcr/master.yaml (a database without TLS needs sslmode=disable), then:
+      sudo systemctl restart trcrd-master && sudo /etc/trcr/finish-setup.sh
     (Or run the installer again with the corrected --postgres-dsn; it updates that line and restarts the master.)
 ```
 
-The second line appears when the installer wrote that entry. Otherwise
-restart the master and run `finish-setup.sh` again. For a refused password on
-an entry the installer wrote, the second line is
+The last line appears only when the installer wrote that entry. For a refused
+password on an entry the installer wrote, it's
 `(Or run the installer again with the corrected --postgres-password-file; it updates that file and restarts the master.)`
 
 `The master and a local agent are running, but the master has not said which
@@ -561,6 +561,13 @@ On an all-in-one host, Grafana listens on 127.0.0.1 only. Use an SSH tunnel
 (`ssh -L 3000:127.0.0.1:3000 <host>`), or run the installer again with
 `--open-grafana`. The admin password is in `/etc/trcr/grafana-admin.env`, and
 `sudo /etc/trcr/finish-setup.sh` shows it again.
+
+Grafana's first start can take a minute or two, longer on a small host. If
+the install ended with `Grafana is still starting; it will be ready in a minute or two.`,
+wait that long. `sudo systemctl status grafana-server` says `activating`
+while it's still starting. Only if the install warned
+`could not start grafana-server` is something wrong; the
+`journalctl -u grafana-server -n 30` command in that warning shows why.
 
 ### Grafana refuses the right password
 
