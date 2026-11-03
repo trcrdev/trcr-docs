@@ -80,6 +80,9 @@ docker compose exec trcr-master cat /run/trcr-secrets/grafana_admin_password
 
 The home dashboard is the TRCR overview; the other sixteen are in the TRCR
 folder. The datasource is already set up and points at the results store.
+On a host with 512 MB of memory Grafana takes about two minutes to show
+its dashboards and pushes the host into swap; leave it out there (see
+below) or give the host more memory.
 
 ### What the first start did
 
@@ -141,7 +144,10 @@ Install `podman-compose` from your distribution first (`sudo dnf install
 podman-compose` on Fedora, `sudo apt install podman-compose` on Debian).
 Without it, `podman compose` fails with "looking up compose provider failed".
 Then follow the Docker steps above with `sudo podman-compose` in place of
-`docker compose`. The `:z` labels on the bind mounts are already in the file
+`docker compose`, including for every check (`sudo podman-compose exec
+trcr-master trcrd agents`): podman-compose names the containers
+`trcr_trcr-master_1` and so on, so a plain `podman exec trcr-master` does
+not find them. The `:z` labels on the bind mounts are already in the file
 for SELinux hosts.
 
 ### With quadlets
