@@ -101,7 +101,8 @@ connect to.
 
 Every run ends with a line pointing at the full log of that run,
 `/var/log/trcr-install.log`. If anything goes wrong, that's the first file to
-read.
+read. Each run's part of it ends with `=== install.sh exit status N ===`,
+where 0 means the run finished without an error.
 
 ## Click the link in your email
 
@@ -272,6 +273,18 @@ them. See [Licensing](licensing.md).
   [Troubleshooting](troubleshooting.md#the-install-ends-without-you-are-all-set).
 - The installer stopped with a signature or OpenSSL error: see
   [Troubleshooting](troubleshooting.md#the-installer-stops-with-a-signature-or-openssl-error).
+- The installer stopped while installing PostgreSQL or Grafana, with the
+  package manager's error and then:
+
+  ```
+  error: Installing Grafana failed: the package repository returned an error (see above).
+         This is usually temporary. Run the same command again in a few minutes; it picks up
+         where it stopped.
+  ```
+
+  This usually means the package repository had a short-lived problem. Do
+  what it says: wait a few minutes and run the same install command again.
+  If it keeps failing, the package manager's error above it says why.
 - An agent enrolled but never reports in: port 8443 is closed, or
   `advertise_addr` is wrong. See
   [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen).
