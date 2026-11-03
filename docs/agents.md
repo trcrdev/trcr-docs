@@ -310,10 +310,13 @@ though its certificate hasn't expired.
   and the old one stays refused.
 - `remove` deletes the record and frees the name.
 - Neither command touches the agent host. If the agent is still installed
-  there, run `sudo trcrd leave --local-only` on it: it stops the agent and
-  deletes its certificate. (Plain `leave` would ask the master, which no
-  longer accepts the agent.) Or uninstall TRCR from it (see
-  [Operations](operations.md#uninstall-trcr)). Both work for agents enrolled
+  there, run `sudo trcrd leave --local-only --yes` on it: it stops the agent
+  and deletes its certificate, without stopping at `Proceed? [y/N]` first.
+  It doesn't tell the master (plain `leave` would ask the master, which no
+  longer accepts the agent). It reminds you that if the master still lists
+  the agent, you remove it there with `sudo trcrd agents remove web-02 --yes`;
+  after `agents remove`, that's already done. Or uninstall TRCR from the host
+  (see [Operations](operations.md#uninstall-trcr)). Both work for agents enrolled
   with a join command or a pairing code. For an agent in a container, remove
   the container together with its volumes; see
   [Containers](containers.md#day-to-day-operations).
