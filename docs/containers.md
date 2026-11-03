@@ -56,7 +56,11 @@ trcr-trcr-results-pg-1 postgres:18-trixie              trcr-results-pg   Up 2 mi
 ```
 
 `trcr-init` and `trcr-enroll` are one-shot jobs; `Exited (0)` is what they
-look like when they succeeded. To see that the agent reports in, run this on
+look like when they succeeded. If `up -d` stops with `service "trcr-init"
+didn't complete successfully: exit 2` (with quadlets: `A dependency job for
+trcr-master.service failed`), the reason is in its log:
+`docker compose logs trcr-init` (quadlets: `sudo journalctl -u trcr-init`).
+It's usually a missing license or address, and the log says how to fix it. To see that the agent reports in, run this on
 the **master**:
 
 ```bash
