@@ -85,7 +85,8 @@ enrollment and the installer says:
 
 ```
 error: The master already has an agent with this name. On the master run:
-         sudo trcrd agents remove web-02
+         sudo trcrd agents remove web-02 --yes
+       Then run this same command again; the token was not spent.
 ```
 
 That usually means the host was enrolled before, then uninstalled or rebuilt,
@@ -96,9 +97,9 @@ sudo trcrd agents remove web-02 --yes
 ```
 
 Then run the same join command on the agent again. A refused attempt doesn't
-use up the token, so the command works for the rest of its hour. To keep the
-old record and enroll under a new name instead, add `--node-id <other-name>`
-to the join command.
+use up the token, so the command works for the rest of its hour, and the agent
+host keeps nothing from the attempt. To keep the old record and enroll under a
+new name instead, add `--node-id <other-name>` to the join command.
 
 If enrollment fails for any other reason, the installer says so and tells you
 what to try:
@@ -200,7 +201,7 @@ counts as down.
 |---|---|
 | `up` | Reporting normally. |
 | `down` | Was reporting, and has been silent for longer than the limit (90 seconds by default). |
-| `never-seen` | Enrolled, but has never made a successful call. See [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen). |
+| `never-seen` | Enrolled, but has never made a successful call. `trcrd agents` lists the usual causes under the table, most common first. See [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen). |
 | `revoked` | You've withdrawn trust in it. Shown only with `--all`. |
 
 `trcrd agents` reads saved state, so it works even when the master is stopped.
@@ -218,7 +219,12 @@ As soon as two agents are enrolled, the master adds a ping between every pair,
 in both directions, named `mesh-<a>-to-<b>`. These feed the Agent Mesh and
 Agent-to-Agent dashboards. They show up in `trcrd probes` marked `auto-mesh`.
 They're not written to your configuration files, and they don't count as a
-license bundle.
+license bundle. The installer's summary counts them apart from the probes in
+your files, so with three agents you'll see:
+
+```
+    Probes       7 in /etc/trcr/conf.d/ + 6 automatic agent-to-agent; change the ones in conf.d/ whenever you like
+```
 
 To turn them off or change how often they run, set this in `master.yaml` and
 restart the master:
@@ -246,10 +252,13 @@ sudo trcrd leave
 Then enroll it with the new master in either of the two ways above.
 
 `trcrd leave` shows the agent's name and its master, and asks you to confirm.
-It tells the old master first, while the agent's certificate still works. Then
-it stops the service and deletes the agent's certificate and `agent.yaml`. If
-the master can't be reached, nothing is deleted. For a master that's gone for
-good, add `--local-only`. To keep `agent.yaml`, add `--keep-config`.
+If you answer no, it prints
+`aborted (nothing changed; pass --yes to skip the prompt)` and exits with
+status 1, so a script can tell. Otherwise it tells the old master first, while
+the agent's certificate still works. Then it stops the service and deletes
+the agent's certificate and `agent.yaml`. If the master can't be reached,
+nothing is deleted. For a master that's gone for good, add `--local-only`. To
+keep `agent.yaml`, add `--keep-config`.
 
 This works the same for an agent enrolled with a pairing code. Its master's
 address isn't in `agent.yaml`, so `leave` uses the one the agent recorded when
