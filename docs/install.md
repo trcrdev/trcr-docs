@@ -13,9 +13,11 @@ Already know what you want? Skip to
 
 ## Before you start
 
-- A Linux host you can use `sudo` on: Debian, Ubuntu, Fedora, or RHEL and its
-  relatives (CentOS Stream, Rocky, Alma, Oracle Linux). Give it at least 2 GB
-  of memory, because PostgreSQL and Grafana run there too.
+- A Linux host you can use `sudo` on, or log in to as root: Debian, Ubuntu,
+  Fedora, or RHEL and its relatives (CentOS Stream, Rocky, Alma, Oracle
+  Linux). Give it at least 2 GB of memory, because PostgreSQL and Grafana run
+  there too. As root on a host without `sudo`, run the same commands; the
+  installer leaves `sudo` off the commands it prints.
 - An email address you can open now. The free license is confirmed by a link
   we email you, and the link works for 24 hours. If you already have a license
   file, you won't need the email.
@@ -53,7 +55,7 @@ the installer says so before it starts. You'll see something like this
 ```
 ==> Installing TRCR v26.11.0 for linux-amd64
 ==> Signature checked: this download is the release TRCR signed.
-==> Installed /usr/local/bin/trcrd (trcrd v26.11.0 ...)
+==> Installed /usr/local/bin/trcrd (trcrd v26.11.0)
 ...
 ==> PostgreSQL is ready: database trcr_results, user trcr, password in /etc/trcr/postgres.env.
 ...
@@ -67,16 +69,32 @@ the installer says so before it starts. You'll see something like this
     Open it whenever suits you. You can close this terminal.
     About 15 seconds after you click, this host starts the master,
     enrolls its local agent and starts recording.
+...
+  What is on this host now:
+    PostgreSQL   database trcr_results on this host only (127.0.0.1:5432); password in /etc/trcr/postgres.env
+    Grafana      Only reachable from this host. From your own computer, run:
+                   ssh -L 3000:127.0.0.1:3000 <this-host>
+                 then open http://localhost:3000 and look in the TRCR folder.
+                 Sign in as admin / <password>  (also in /etc/trcr/grafana-admin.env)
+                 To reach it directly instead, run the installer again with --open-grafana.
+    Probes       7 starter probes in /etc/trcr/conf.d/standalone.yaml; change them whenever you like
 ```
 
-Three lines matter:
+Three things matter:
 
 - `Signature checked` means the download is the release TRCR signed. If the
   check fails, the installer stops before it installs anything.
 - `PostgreSQL is ready` tells you where your results will be kept.
-- The summary at the end, under `What is on this host now:`, shows how to reach
-  Grafana and the admin password. The password is shown once here, so copy it
-  now. It's also kept in `/etc/trcr/grafana-admin.env`.
+- The Grafana address and admin password. With `--email`, they're under
+  `What is on this host now:` at the end, as above. With `--license`, that
+  block lists only PostgreSQL and the probes. The password is on the
+  `Grafana:` line a little higher up, just before the command for adding
+  another host. Copy it now. It's also kept in `/etc/trcr/grafana-admin.env`.
+
+Where the `ssh -L` command says `<this-host>`, put in the name or address you
+use to reach the host over SSH. The summary fills in the host's own address
+only when it's a public one; a private address is often not the one you'd
+connect to.
 
 Every run ends with a line pointing at the full log of that run,
 `/var/log/trcr-install.log`. If anything goes wrong, that's the first file to
@@ -112,14 +130,35 @@ enrolled as web-01-local
 You are all set. The master and a local agent are running and recording.
 
     Dashboards with data now      Ping, HTTP, DNS, Overview, Per-Agent Operations, SLO Landing
-    Within the hour               SSL Expiry, Cert Fleet (1h probe), Traceroute, Map, Alive
+    Within the hour               SSL Expiry, Cert Fleet, Traceroute, Map, Alive (as those probes first run)
     Once a second agent joins     Agent-to-Agent, Agent Mesh, Cross-Vantage RTT Divergence
     Need their own probes         Throughput, BGP, DNS Propagation (see /etc/trcr/examples/)
 ```
 
-When you see `You are all set`, you're done. The list tells you which
-dashboards fill straight away and which stay empty for now. An empty
-Traceroute or Agent Mesh panel in the first few minutes is normal.
+When you see `You are all set`, you're done. It appears only when the master
+opened your results store, probes are configured and the local agent is
+running.
+
+The list is built from the results that have arrived, so it tells you which
+dashboards have data now and which fill later. An empty Traceroute or Agent
+Mesh panel in the first few minutes is normal.
+
+If something is missing, you'll see one of these instead:
+
+- `Nothing is measured yet: no probes are configured.` The host is fine, but
+  there's nothing to measure. It prints the three commands that copy the
+  sample probes, check them and restart the master.
+- `The master did not start.` The setup waits up to 45 seconds for the master
+  before it says this. The next line is the master's own error. If the
+  `trcr` user can't read a file, such as a license copied with `cp`, it also
+  prints the `chgrp` and `chmod` commands that fix it.
+- `The master is running, but it is not saving results anywhere, so they are
+  being thrown away.` The `Its log says:` line quotes the error from your
+  results store, for example a wrong database password, and the lines after it
+  say where to fix it.
+
+Fix what it names, then run `sudo /etc/trcr/finish-setup.sh` again. For more
+on each one, see [Troubleshooting](troubleshooting.md#the-install-ends-without-you-are-all-set).
 
 The local agent is named after the host, with `-local` on the end.
 
@@ -135,7 +174,8 @@ sudo /etc/trcr/finish-setup.sh
 ```
 
 It claims a waiting license, starts whatever isn't running, enrolls the local
-agent if there isn't one, and shows the Grafana password again.
+agent if there isn't one, and shows the Grafana password again. Its output
+also goes to `/var/log/trcr-install.log`.
 
 ## Open your dashboards
 
@@ -149,7 +189,8 @@ ssh -L 3000:127.0.0.1:3000 <your-trcr-host>
 Then open `http://localhost:3000` in your browser and sign in as `admin` with
 the password from the install summary. If you've lost it, it's in
 `/etc/trcr/grafana-admin.env`, and `sudo /etc/trcr/finish-setup.sh` shows it
-again.
+again. Copy it rather than retyping it: after five wrong passwords, Grafana
+locks the account for five minutes.
 
 The dashboards are in the **TRCR** folder. Open **SLO Landing** first: it
 shows at a glance whether your probes are succeeding. For what the other
@@ -207,6 +248,8 @@ them. See [Licensing](licensing.md).
   commands above.
 - The install finished but nothing is running: you haven't clicked the link in
   the license email yet. See [Click the link in your email](#click-the-link-in-your-email).
+- The setup ended without `You are all set`: see
+  [Troubleshooting](troubleshooting.md#the-install-ends-without-you-are-all-set).
 - The installer stopped with a signature or OpenSSL error: see
   [Troubleshooting](troubleshooting.md#the-installer-stops-with-a-signature-or-openssl-error).
 - An agent enrolled but never reports in: port 8443 is closed, or
@@ -226,7 +269,9 @@ First, create an empty database and a user that owns it. TRCR creates and
 maintains its own tables inside that database, so there's no schema to load.
 
 Put the database password on the first line of a file that only you can read.
-Then run this on the master host:
+Leave it out of the URL: the installer refuses a URL with `USER:PASSWORD@` in
+it, so the password stays out of your shell history, the install log and
+`master.yaml`. Then run this on the master host:
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh -s -- \
@@ -238,20 +283,30 @@ The installer copies the password into `/etc/trcr/postgres.env`, which only
 root and the `trcr` group can read, and hands it to the master through
 systemd. It never goes into `master.yaml`, and you can delete your file
 afterwards. If `psql` is installed on the host, the installer checks it can
-connect, and stops if it can't.
+connect, and stops if it can't. Without `psql`, the connection is tried when
+the master starts.
 
 If the password is already in an exported environment variable, use
 `--postgres-password-env <NAME>` instead of `--postgres-password-file`. Either
 way, the password can't contain a quote mark or a backslash.
 
-The installer then prints the steps that are left. Here they are with the
-reason for each:
+So that your database gets data straight away, the installer also writes seven
+starter probes that measure this host's connection to the internet:
+
+```
+==> Added 7 starter probes so you see data in your database straight away (/etc/trcr/conf.d/standalone.yaml).
+```
+
+Without a license, the installer stops there and prints the steps that are
+left. Here they are with the reason for each:
 
 1. If agents on other hosts will connect, set `master.advertise_addr` in
    `/etc/trcr/master.yaml` to a name or address they can reach. See
    [Configuration](configuration.md#advertise_addr-is-required-for-remote-agents).
-2. Give the master something to measure. To start from the sample probes,
-   copy them to an active name, then edit the targets:
+2. Add probes of your own. The starter probes run as soon as the master
+   starts, so this can wait.
+   To start from the sample probes, copy them to an active name, then edit the
+   targets:
 
    ```bash
    sudo install -o root -g trcr -m 0640 /etc/trcr/conf.d/_samples.yaml /etc/trcr/conf.d/probes.yaml
@@ -274,7 +329,12 @@ reason for each:
    sudo trcrd license request --email you@example.com --company "Your Company" --wait
    ```
 
-   Already have a license file? Copy it to `/etc/trcr/license.lic` instead.
+   Already have a license file? Install it so the master can read it:
+
+   ```bash
+   sudo install -o root -g trcr -m 0640 license.lic /etc/trcr/license.lic
+   ```
+
 5. Start everything:
 
    ```bash
@@ -282,12 +342,21 @@ reason for each:
    ```
 
    This starts the master, enrolls a local agent and prints the command for
-   adding more agents.
+   adding more agents. Without `psql` on the host, a working connection shows
+   as `The master opened your PostgreSQL database; results are going there.`
 
 You can also add `--license /path/to/license.lic` to the install command. The
-master then starts straight away, before you've added any probes. Add them
-afterwards, validate, and restart the master with
-`sudo systemctl restart trcrd-master`.
+master then starts straight away with the starter probes, and the install ends
+the way the all-in-one install does. To add probes afterwards, copy them in,
+validate, and restart the master with `sudo systemctl restart trcrd-master`.
+
+The summary at the end shows what the master uses:
+
+```
+  What is on this host now:
+    PostgreSQL   your database trcr_results at db.example.com:5432; password in /etc/trcr/postgres.env
+    Probes       7 starter probes in /etc/trcr/conf.d/standalone.yaml; change them whenever you like
+```
 
 To use a store other than PostgreSQL, install with no options (see below) and
 follow [Storing results](backends.md).
@@ -316,7 +385,14 @@ installer ends with the five steps you still need: choose a results store,
 copy the sample probes, validate, get a license and start. They're the same
 steps as in
 [A master with a database you already run](#a-master-with-a-database-you-already-run),
-plus choosing the store. See [Storing results](backends.md).
+plus choosing the store.
+
+For PostgreSQL, step 1 tells you to run the installer again with
+`--postgres-dsn` and `--postgres-password-file`, which writes the
+configuration for you. For any other store, you edit `backends:` in
+`master.yaml` yourself, and a password the store names with `password_env`
+goes in `/etc/trcr/master.env` as `NAME=value`. The master's service reads that
+file. See [Storing results](backends.md).
 
 ### Installer options
 
@@ -418,7 +494,9 @@ The all-in-one install also:
 The installer changes the host firewall only when you give `--open-firewall`.
 
 You can run the installer as often as you like. Running it again upgrades
-`trcrd` and leaves your configuration, license and data alone.
+`trcrd`, restarts the TRCR services that were running, and leaves your
+configuration, license and data alone. See
+[Operations](operations.md#upgrade-trcr).
 
 ### How the installer protects you
 
