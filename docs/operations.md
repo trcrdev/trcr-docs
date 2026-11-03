@@ -243,12 +243,17 @@ print a new join command; it says
 and points at `sudo trcrd enroll-agent`.
 
 If the master's service file came from an older release, the installer keeps
-it and adds a drop-in with the two settings newer service files carry, before
-the restart:
+it and adds a drop-in with the two settings newer service files carry, right
+after installing the new `trcrd` and before the restart:
 
 ```
+==> Installed /usr/local/bin/trcrd (trcrd v26.11.0)
+==> Kept your existing trcrd-master service file (/etc/systemd/system/trcrd-master.service).
 ==> Added /etc/systemd/system/trcrd-master.service.d/10-trcr.conf so the kept service file reads /etc/trcr/master.env.
+==> Restarting trcrd-master so it runs the new version ...
 ```
+
+You see the `Kept` and `Added` lines only on the run that adds the drop-in.
 
 In a kept service file that still links to an old documentation address, the
 installer points the `Documentation=` line at these docs. It changes nothing
