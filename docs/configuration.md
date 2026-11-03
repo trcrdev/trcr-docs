@@ -122,7 +122,7 @@ shipper.
 master:
   listen_addr: 0.0.0.0:8443          # agents connect here
   enroll_listen_addr: 0.0.0.0:8444   # enrollment
-  health_listen_addr: 0.0.0.0:8080   # plain health check for load balancers
+  health_listen_addr: 0.0.0.0:8080   # optional plain /healthz for load balancers; off unless set
   advertise_addr: trcr-master.example.com:8444   # see below
   throughput_port: 5202              # port for bandwidth tests across the deployment
   agents:
