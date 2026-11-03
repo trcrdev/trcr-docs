@@ -188,8 +188,8 @@ The local agent is named after the host, with `-local` on the end.
 `trcr-firstboot` exists only when you installed with `--email`. With
 `--license`, the same output appears in your terminal at the end of the
 install instead. If it ends with one of the messages above, the installer
-ends with `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
-and exits with status 1.
+prints `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
+above its closing Docs and Help line, and exits with status 1.
 
 To finish by hand at any time, run this on the host. It's safe to run as often
 as you like:
@@ -454,8 +454,8 @@ left. Here they are with the reason for each:
 You can also add `--license /path/to/license.lic` to the install command. The
 master then starts straight away with the starter probes, and the install ends
 the way the all-in-one install does. If the master can't open the database,
-the install ends with `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
-and exits with status 1. To add probes afterwards, copy them in, validate, and
+the install prints `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
+above its closing Docs and Help line, and exits with status 1. To add probes afterwards, copy them in, validate, and
 restart the master with `sudo systemctl restart trcrd-master`.
 
 The summary at the end shows what the master uses:
