@@ -59,6 +59,7 @@ services:
       - trcr_secrets:/run/trcr-secrets
       - trcr_grafana_provisioning:/grafana/provisioning
       - trcr_grafana_dashboards:/grafana/dashboards
+    networks: [trcr_net]
 
   trcr-results-pg:
     image: postgres:18-trixie
@@ -123,6 +124,7 @@ services:
       - ./etc:/etc/trcr:ro,z
       - trcr_master_state:/var/lib/trcr
       - trcr_bootstrap:/run/trcr-bootstrap
+    networks: [trcr_net]
 
   # Measures from this host: host networking, so latency and traceroute
   # reflect the host's own interfaces. Enrolls itself on its first start
@@ -168,6 +170,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
+# Every service that is not on the host network is on trcr_net, so the
+# stack creates no second (default) network and removing one service
+# never deletes a network the others use.
 networks:
   trcr_net: {}
 

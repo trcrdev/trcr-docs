@@ -251,15 +251,16 @@ cause, then start clean:
 
 ```bash
 docker compose exec trcr-master trcrd agents remove --yes trcr-agent-1
-docker compose down trcr-agent-1 trcr-enroll
+docker compose rm -sf trcr-agent-1 trcr-enroll
 docker volume rm trcr_trcr_agent_1_etc trcr_trcr_agent_1_state trcr_trcr_bootstrap
 docker compose up -d
 ```
 
-`agents remove` only matters when the agent is already listed; a listed
-agent whose volumes are gone can't enroll again under the same name
-otherwise. For a remote agent, run `enroll-agent --env` again and replace
-the two lines in its `.env`.
+`rm -sf` removes just those two containers (`down` would also remove the
+network the rest of the stack uses). `agents remove` only matters when the
+agent is already listed; a listed agent whose volumes are gone can't enroll
+again under the same name otherwise. For a remote agent, run
+`enroll-agent --env` again and replace the two lines in its `.env`.
 
 **Upgrading.** Put `TRCR_IMAGE=ghcr.io/trcrdev/trcrd:<release>` in `.env`
 and run `docker compose up -d`; with quadlets, change the `Image=` line in
