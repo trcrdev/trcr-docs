@@ -115,14 +115,16 @@ says:
 ```
 
 The second line appears when the installer wrote that entry. Otherwise
-restart the master and run `finish-setup.sh` again.
+restart the master and run `finish-setup.sh` again. For a refused password on
+an entry the installer wrote, the second line is
+`(Or run the installer again with the corrected --postgres-password-file; it updates that file and restarts the master.)`
 
 `The master and a local agent are running, but the master has not said which
 results store it opened, so whether results are being saved is not known
 yet.` On a host without `psql`, the setup can't look for rows, so it relies on
-the master's log. It waits up to 10 seconds after a fresh start for the master
-to report its stores. If it hasn't by then, you get this instead of
-`You are all set`. Look in a minute with `sudo journalctl -u trcrd-master -n 30`:
+the master's log. It gives a master that has just started up to a minute to
+report its stores. If it hasn't by then, you get this instead of
+`You are all set`. Look again with `sudo journalctl -u trcrd-master -n 30`:
 `backend ready` means results are being saved, `DISCARDED` means they aren't.
 
 `The master is running, but the local agent is not.` The agent's log says why:
@@ -164,6 +166,12 @@ again with the same options and `sslmode=disable` in the URL. It updates the
 `dsn:` line it wrote in `master.yaml`, says
 `Updated the database address in /etc/trcr/master.yaml.`, and restarts the
 master if it's running.
+
+If the database says `password authentication failed`, put the right password
+in your password file and run the installer again with the same options. It
+says `Updated the database password in /etc/trcr/postgres.env.` and restarts
+the master if it's running. Either way, it then gives the master up to a
+minute to open the database before it says whether results are being saved.
 
 If the installer says `--postgres-dsn has a password in it`, take
 `:PASSWORD` out of the URL and give the password with

@@ -166,9 +166,9 @@ If something is missing, you'll see one of these instead:
 - `The master and a local agent are running, but the master has not said which
   results store it opened, so whether results are being saved is not known
   yet.` This appears only on a host without `psql`, where the setup relies on
-  the master's log instead of looking for rows. It waits up to 10 seconds for
-  the master to report its stores; if it hasn't by then, look in a minute with
-  `sudo journalctl -u trcrd-master -n 30`. `backend ready` means results are
+  the master's log instead of looking for rows. It gives a master that has
+  just started up to a minute to report its stores; if it hasn't by then, look
+  again with `sudo journalctl -u trcrd-master -n 30`. `backend ready` means results are
   being saved; `DISCARDED` means they aren't.
 
 Fix what it names, then run `sudo /etc/trcr/finish-setup.sh` again. For more
@@ -305,10 +305,10 @@ installs and the stock PostgreSQL container image, needs `sslmode=disable`;
 otherwise the master's connection is refused at the handshake and nothing is
 saved.
 
-The installer copies the password into `/etc/trcr/postgres.env`, which only
-root and the `trcr` group can read, and hands it to the master through
-systemd. It never goes into `master.yaml`, and you can delete your file
-afterwards. If `psql` is installed on the host, the installer checks it can
+The installer copies the password into `/etc/trcr/postgres.env`, as one line,
+`TRCR_PG_PASSWORD=<password>`. Only root and the `trcr` group can read that
+file, and systemd hands it to the master. The password never goes into
+`master.yaml`, and you can delete your file afterwards. If `psql` is installed on the host, the installer checks it can
 connect, and stops if it can't. Without `psql`, the connection is tried when
 the master starts. Once the configuration is written, the installer says:
 
@@ -326,6 +326,15 @@ or `sslmode` turns out to be wrong, run the installer again with the corrected
 `--postgres-dsn`. It updates the `dsn:` line of that entry and says
 `Updated the database address in /etc/trcr/master.yaml.`; if the master is
 running, it follows with `Restarting trcrd-master so it uses the new address ...`.
+
+A wrong password works the same way. Run the installer again with the
+corrected `--postgres-password-file`. It says
+`Updated the database password in /etc/trcr/postgres.env.` and, if the master
+is running, `Restarting trcrd-master so it uses the new password ...`. If both
+changed, one restart covers both. After a restart for a new address or
+password, the installer gives the master up to a minute to open the database
+before it says whether results are being saved, so a database far away has
+time to answer.
 
 If `/etc/trcr/master.yaml` was already on the host and the installer didn't
 write it, it's left as it is, and the end of the run says so:
