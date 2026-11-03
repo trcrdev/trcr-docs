@@ -340,9 +340,9 @@ support@trcr.dev with the code and detail. See
 
 ### Enrolling an agent fails
 
-If the installer says `The master already has an agent with this name.`, the
+If the join says `The master already has an agent with this name.`, the
 master still has a record under that name, often from an earlier install of
-the same host. The installer prints the fix:
+the same host. It prints the fix:
 
 ```
 error: The master already has an agent with this name. On the master run:
@@ -378,8 +378,11 @@ healthy and can't be reached.
 
 ### An agent is stuck at `never-seen`
 
-The agent enrolled, then never made a successful call. `trcrd agents` prints
-the usual causes under the table, in the same order as this page:
+The agent enrolled, then never made a successful call. Any call counts,
+including its first fetch of its probes, so a working agent shows `up` within
+seconds of enrolling. If it's still `never-seen`, it really hasn't got
+through. `trcrd agents` prints the usual causes under the table, in the same
+order as this page:
 
 ```
 NODE_ID       STATUS      LAST SEEN  PROBES  CERT EXPIRES

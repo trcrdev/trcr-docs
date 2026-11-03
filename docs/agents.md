@@ -68,8 +68,8 @@ Things worth knowing about the join command:
   it. Keep it in the command.
 - The agent's name defaults to its hostname, in lower case. To choose another
   name, run `enroll-agent` with `--node-id <name>`.
-- If `trcrd` is already installed on the agent host, `enroll-agent` also prints
-  the shorter `sudo trcrd join …` form.
+- Under the command, `enroll-agent` also prints the shorter
+  `sudo trcrd join …` form, for a host that already has `trcrd` installed.
 - Pasting the same command twice is harmless. On a host that's already
   enrolled, the installer says `This host is already enrolled as <name>.` and
   only makes sure the service is installed and running.
@@ -81,7 +81,7 @@ Things worth knowing about the join command:
   `sudo trcrd enroll-agent --env`. See [Containers](containers.md).
 
 If the master already has an agent with the same name, it refuses the
-enrollment and the installer says:
+enrollment and the join stops with:
 
 ```
 error: The master already has an agent with this name. On the master run:
@@ -201,7 +201,7 @@ counts as down.
 |---|---|
 | `up` | Reporting normally. |
 | `down` | Was reporting, and has been silent for longer than the limit (90 seconds by default). |
-| `never-seen` | Enrolled, but has never made a successful call. `trcrd agents` lists the usual causes under the table, most common first. See [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen). |
+| `never-seen` | Enrolled, but has never made a successful call. A working agent shows `up` at its first contact, even right after enrolling again under the same name, so this means it really hasn't got through. `trcrd agents` then lists the usual causes under the table, most common first. See [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen). |
 | `revoked` | You've withdrawn trust in it. Shown only with `--all`. |
 
 `trcrd agents` reads saved state, so it works even when the master is stopped.
