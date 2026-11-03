@@ -21,8 +21,9 @@ sudo install -o root -g trcr -m 0640 /etc/trcr/conf.d/_samples.yaml /etc/trcr/co
 sudo nano /etc/trcr/conf.d/probes.yaml
 ```
 
-Any editor run with `sudo` works in place of `nano`; minimal images have only
-`vi`.
+Any editor run with `sudo` works in place of `nano`; minimal images may have
+only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+`sudo dnf install nano` (Fedora, CentOS).
 
 Or write your own file. Here's a small one with the most common types:
 

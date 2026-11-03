@@ -80,9 +80,10 @@ sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
 sudo trcrd validate
 ```
 
-Any editor run with `sudo` works in place of `nano`; minimal images have only
-`vi`. `validate` warns about any variable the master needs that no file of
-its service sets.
+Any editor run with `sudo` works in place of `nano`; minimal images may have
+only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+`sudo dnf install nano` (Fedora, CentOS). `validate` warns about any variable
+the master needs that no file of its service sets.
 If your master's service doesn't read `master.env` yet, see
 [Storing results](backends.md#passwords-and-tokens).
 

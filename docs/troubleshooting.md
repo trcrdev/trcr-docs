@@ -259,8 +259,9 @@ sudo nano /etc/trcr/master.env         # add TRCR_PG_PASSWORD=your-password
 sudo systemctl restart trcrd-master
 ```
 
-Any editor run with `sudo` works in place of `nano`; minimal images have only
-`vi`.
+Any editor run with `sudo` works in place of `nano`; minimal images may have
+only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+`sudo dnf install nano` (Fedora, CentOS).
 
 If `validate` says the unit has no `EnvironmentFile=` at all, your master's
 service file is older than `master.env`. Run the installer again: it keeps
