@@ -104,7 +104,8 @@ To run TRCR in Docker or Podman instead, see [Containers](containers.md).
 
 - A Linux host for the master, with root access through `sudo`. If you're
   logged in as root on a host without `sudo`, leave `sudo` off the commands in
-  these pages.
+  these pages. The commands the installer and `trcrd` print leave it off by
+  themselves on such a host.
 - `curl`, and OpenSSL 1.1.1 or later. The installer uses OpenSSL to check the
   download's signature, and tells you which package to install if it's
   missing. On macOS, the built-in LibreSSL isn't enough; install OpenSSL with
