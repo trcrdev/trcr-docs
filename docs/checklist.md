@@ -46,7 +46,8 @@ dashboards, and come back here before you rely on the data.
 
 - [ ] Point the master at a real results store. A master installed with no
       options writes results to the journal only. The all-in-one install and
-      `--postgres-dsn` set up PostgreSQL for you. See
+      `--postgres-dsn` set up PostgreSQL for you. For a database without
+      TLS, the URL needs `sslmode=disable`, or the store never opens. See
       [Storing results](backends.md).
 - [ ] Copy the sample probes before you edit them. Files whose names start
       with `_` are ignored, so `_samples.yaml` does nothing until you copy it.
@@ -69,7 +70,8 @@ dashboards, and come back here before you rely on the data.
       probes, or they're refused. See
       [Probes](probes.md#private-and-internal-targets).
 - [ ] Keep passwords out of YAML. Use the `*_env` settings, with the values in
-      `/etc/trcr/master.env`, or `trcrd encrypt-password`. See
+      `/etc/trcr/master.env`, which the installer creates with the right
+      permissions, or `trcrd encrypt-password`. See
       [Security](security.md#secrets-in-configuration).
 - [ ] Install files with `sudo install -o root -g trcr -m 0640`, not `cp`,
       license included. The master runs as the `trcr` user and won't start if
