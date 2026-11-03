@@ -1,12 +1,14 @@
 # Licensing
 
-The master needs a valid licence file to start. Agents need nothing: the
-licence lives on the master.
+The master needs a license file before it can start. The license lives on the
+master only: agents don't need one, and they don't need an email address
+either.
 
-## What the licence controls
+## What the license controls
 
-Probe types are grouped into four bundles. A licence says which bundles you may
-use and how many monitored targets each one allows.
+Probe types are grouped into four bundles. Your license says which bundles you
+can use, how many targets each one may monitor, and how many agents you can
+enroll.
 
 | Bundle | Probe types |
 |---|---|
@@ -15,54 +17,76 @@ use and how many monitored targets each one allows.
 | `performance` | `throughput`, `dns_propagation`, `snmp` |
 | `routing` | `bgp` |
 
-Agents and results stores are free in every tier. A probe in a bundle you are
-not licensed for stops the master from starting, with the error
-`bundle_not_licensed`.
+Results stores are free in every tier. If a probe uses a bundle your license
+doesn't include, the master won't start, and its log names the probe with the
+error `bundle_not_licensed`.
 
 ## The free tier
 
-- 5 agents and all four bundles.
-- Up to 15 web, 20 reachability, 10 performance and 5 routing targets.
-- A one-year term that renews automatically while the master can reach
+- Up to five agents. On an all-in-one host, the local agent is one of them.
+  Agents you've revoked don't count.
+- All four bundles, with up to 15 web, 20 reachability, 10 performance and 5
+  routing targets.
+- A one-year term that renews by itself while the master can reach
   `api.trcr.dev`.
-- One free licence per verified email address. Reinstalling verifies the
-  address again and downloads the same licence.
+- One free license per verified email address. If you reinstall, verifying the
+  address again downloads the same license.
 
-## Getting a free licence
+## Get a free license
 
-```bash
-sudo trcrd license request --email you@example.com --company "Your Company"
-```
-
-Open the verification link in the email, then:
-
-```bash
-sudo trcrd license claim --wait
-```
-
-This downloads the signed licence to `/etc/trcr/license.lic`. If the master is
-already running, `claim` restarts it so the licence takes effect, and checks
-that it came back up. Add `--no-restart` to do that yourself later. A master
-that is stopped is left stopped.
-
-`--wait` on `request` does both steps in one command: it sends the request and
-waits for you to click the link.
+The all-in-one install can do this for you (see
+[Install TRCR](install.md#install-everything-on-one-host)). To do it by hand,
+run this on the master:
 
 ```bash
 sudo trcrd license request --email you@example.com --company "Your Company" --wait
 ```
 
+It shows what it's about to send and asks you to confirm; add `--yes` to skip
+the question. Then we email you a verification link. While you open your
+inbox, the command waits and says so:
+
+```
+waiting for the verification link sent to you@example.com to be opened; this finishes within seconds of the click (Ctrl-C is safe — resume with `trcrd license claim --wait`)
+```
+
+It isn't stuck. Click the link, and within a few seconds the license is saved
+to `/etc/trcr/license.lic`:
+
+```
+license installed: /etc/trcr/license.lic
+```
+
+If you stop the command with Ctrl-C, nothing is lost. Pick it up again with:
+
+```bash
+sudo trcrd license claim --wait
+```
+
+If the master is already running, `claim` restarts it so the license takes
+effect, and checks it came back up. Add `--no-restart` to restart it yourself
+later. A master that's stopped stays stopped; start it with
+`sudo /etc/trcr/finish-setup.sh`.
+
+You can also split the two steps: run `license request` without `--wait`, click
+the link, then run `sudo trcrd license claim`.
+
 ## Paid tiers
+
+To ask for a paid license, run this on the master:
 
 ```bash
 sudo trcrd license request --tier paid --email you@example.com --company "Your Company"
 ```
 
-Paid requests are reviewed before a licence is issued. `trcrd license claim`
-exits with status 3 while the licence is not ready yet, and installs it once it
-is. You also receive the licence file by email.
+We review paid requests before issuing a license. Until it's ready,
+`trcrd license claim` exits with status 3; once it's issued, the same command
+installs it. We also email you the license file.
 
-## Checking a licence
+## Check your license
+
+To see the installed license, any renewed copy and any request that's still
+waiting, run:
 
 ```bash
 sudo trcrd license status
@@ -70,49 +94,64 @@ sudo trcrd license status
 
 ## Renewal
 
-The master renews a free licence automatically during its regular check-in with
-`api.trcr.dev`. The renewed file is saved to `/var/lib/trcr/license.lic`, not
-next to the original in `/etc/trcr`, because the service may not write to
-`/etc/trcr`. The master finds the renewed file by itself, and
-`trcrd license status` reports both.
+The master renews a free license by itself during its hourly check-in with
+`api.trcr.dev`. It saves the renewed file to `/var/lib/trcr/license.lic`,
+because the service isn't allowed to write to `/etc/trcr`. The master finds
+the renewed file by itself, and `trcrd license status` shows both.
 
-A renewed licence takes effect at the next restart of the master. The master
-does not restart itself; it logs a reminder.
+A renewed license takes effect the next time the master starts. The master
+doesn't restart itself; it logs `license renewed via heartbeat; restart to
+apply` so you can choose when.
 
-When a licence expires, the master stops. A failed check-in does not stop it.
+When a license expires, the master stops. A failed check-in doesn't stop it:
+monitoring carries on, and the master keeps trying.
 
-## Problems
+## If something goes wrong
 
-### I did not get the verification email
+### The verification email didn't arrive
+
+Check your spam folder first. Then ask for a new link:
 
 ```bash
 sudo trcrd license resend
 ```
 
-This sends a new link, valid for 24 hours, and the old link stops working.
-Check your spam folder first.
+The new link works for 24 hours, and the old one stops working.
 
-Do **not** run `license request` again to get a new email. A second request
-cancels the first one, including on another host using the same address.
+Don't run `license request` again to get a new email. A new request cancels
+the old one, even one made on a different host with the same address, and
+you'd be left with two links of which only one works.
 
-### `claim` says the request is not recognised
+### `claim` says the request isn't recognized
 
-The usual cause is a second `license request` for the same email address, on
+Usually a second `license request` was made for the same email address, on
 this host or another. Each new request replaces the one before. The command
-prints the request it has on file and its age, and walks you through the
+shows the request it has on file and how old it is, and walks you through the
 options: resend, claim on the other host, or start again on purpose. A request
 can be claimed for 30 days.
 
-### The master still says it has no licence after I claimed one
+### The master still says it has no license after you claimed one
 
-The licence is read once, when the master starts. Restart it:
+The master reads its license once, when it starts. Restart it:
 
 ```bash
 sudo systemctl restart trcrd-master
 ```
 
-### Moving a licence to another host
+### The master's log says the TRCR API is refusing the license
+
+The line looks like this:
+
+```
+heartbeat: the TRCR API is refusing this license (<code>: <detail>); monitoring continues unaffected — run `trcrd license status`, and contact support@trcr.dev if the license should be valid
+```
+
+Your monitoring isn't affected. Run `sudo trcrd license status`, and if the
+license should be valid, email support@trcr.dev with the code and detail from
+that line.
+
+### Move a license to another host
 
 Copy `/etc/trcr/license.lic` to the new master, or request it again with the
-same email address. Keep a copy of the file before you uninstall with
-`--purge`.
+same email address. Before you uninstall with `--purge`, keep a copy of the
+file somewhere safe.
