@@ -12,8 +12,9 @@ sudo trcrd validate --config /etc/trcr/master.yaml
 
 If the problem happened during an install, read `/var/log/trcr-install.log`
 first. It holds every installer run: the installer's own `==>` lines and
-warnings, the package managers' output, and everything `finish-setup.sh`
-printed.
+warnings, the package managers' output, everything `finish-setup.sh`
+printed, and an agent's enrollment, including the master's refusal when a
+join fails.
 
 A healthy master logs almost nothing but `INFO` lines. A `WARN` or `ERROR`
 line is worth reading, and most of them name the fix. See
@@ -359,12 +360,13 @@ error: The master already has an agent with this name. On the master run:
 
 Run the `remove` command on the **master**, then the same join command on the
 agent again. The refused attempt didn't use up the token, so it works for the
-rest of its hour, and the agent host keeps nothing from the attempt. To keep
-the old record instead, add `--node-id <other-name>` to the join command.
+rest of its hour, and the agent host keeps nothing from the attempt but the
+`trcrd` binary. To keep the old record instead, add `--node-id <other-name>`
+to the join command.
 
 Otherwise the installer prints `This host could not enroll with the master.`
-The agent host keeps nothing from a failed attempt, so you can retry straight
-away:
+The agent host keeps nothing from a failed attempt but the `trcrd` binary, so
+you can retry straight away:
 
 1. Get a fresh command. Each token works once and expires after an hour. Run
    `sudo trcrd enroll-agent` on the master and paste the new command on the

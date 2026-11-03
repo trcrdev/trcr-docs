@@ -49,6 +49,8 @@ installs and starts the agent's service. You'll see:
 enrolled as web-02
 ...
 ==> This host is enrolled and the agent is running. Nothing else to do here.
+...
+    To upgrade this agent later, run:  curl -fsSL https://trcr.dev/install/install.sh | sh
 ```
 
 To check it worked, run `sudo trcrd agents` on the master. The new agent
@@ -98,8 +100,9 @@ sudo trcrd agents remove web-02 --yes
 
 Then run the same join command on the agent again. A refused attempt doesn't
 use up the token, so the command works for the rest of its hour, and the agent
-host keeps nothing from the attempt. To keep the old record and enroll under a
-new name instead, add `--node-id <other-name>` to the join command.
+host keeps nothing from the attempt but the `trcrd` binary. To keep the old
+record and enroll under a new name instead, add `--node-id <other-name>` to
+the join command.
 
 If enrollment fails for any other reason, the installer says so and tells you
 what to try:
@@ -112,10 +115,14 @@ error: This host could not enroll with the master.
        port 8444:  nc -vz 192.0.2.10 8444
 ```
 
-Do what it says. The agent host keeps nothing from a failed attempt, so you can
-paste a new command straight away. If `nc` can't connect, the master's port
-8444 is closed or the address is one the agent can't reach. If you've hit the
-license's agent limit, the master's log says so (see above).
+Do what it says. The agent host keeps nothing from a failed attempt but the
+`trcrd` binary, so you can paste a new command straight away. If `nc` can't
+connect, the master's port 8444 is closed or the address is one the agent
+can't reach. If you've hit the license's agent limit, the master's log says so
+(see above).
+
+Like every installer run, a failed join ends with the line pointing at
+`/var/log/trcr-install.log`, and the master's refusal is in that log too.
 
 ## Pair an agent the master can reach
 
@@ -300,8 +307,13 @@ though its certificate hasn't expired.
   You can enroll a new agent under the same name; it gets a new certificate,
   and the old one stays refused.
 - `remove` deletes the record and frees the name.
-- Neither command touches the agent host. Run `sudo trcrd leave` there, or
-  uninstall TRCR from it (see [Operations](operations.md#uninstall-trcr)).
-  Both work for agents enrolled with a join command or a pairing code.
+- Neither command touches the agent host. If the agent is still installed
+  there, run `sudo trcrd leave --local-only` on it: it stops the agent and
+  deletes its certificate. (Plain `leave` would ask the master, which no
+  longer accepts the agent.) Or uninstall TRCR from it (see
+  [Operations](operations.md#uninstall-trcr)). Both work for agents enrolled
+  with a join command or a pairing code. For an agent in a container, remove
+  the container together with its volumes; see
+  [Containers](containers.md#day-to-day-operations).
 
 Revoked and removed agents no longer count toward your license's agent limit.
