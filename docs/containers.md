@@ -164,7 +164,8 @@ trcr-master && sudo podman-compose start trcr-master`). There is no `rm`;
 One `sudo podman-compose up -d` runs `trcr-init` several times, once for each
 service that depends on it; that's how podman-compose starts dependencies.
 The first run does the setup, and each later one prints only
-`trcr-init: already set up; nothing to do.`
+`trcr-init: already set up; nothing to do.` That makes the first start take
+about 30 seconds once the images are pulled, rather than 20.
 
 ### With quadlets
 
@@ -358,8 +359,12 @@ trcr-master`; where it says `journalctl -u trcrd-agent`, use
 
 **Removing everything.** `docker compose down -v` stops the containers and
 deletes the volumes, including the master's CA and the results. `etc/` on
-the host stays. To start from scratch, remove `etc/` as well, after keeping a
-copy of `etc/license.lic`.
+the host stays. To start from scratch, keep a copy of `etc/license.lic` (it
+belongs to uid 65532, so copy it with `sudo`), remove `etc/` as well, and put
+the copy back as `etc/license.lic` before `docker compose up -d`. Otherwise
+the first start installs `license.lic` from next to `compose.yml` if it's
+still there, or, with `TRCR_LICENSE_EMAIL` in `.env`, requests a new license
+by email.
 
 With quadlets, stop every `trcr-` unit, including the volume and network
 units Quadlet generated so that a later install creates the volumes again,
@@ -376,7 +381,9 @@ sudo podman network rm trcr
 
 `/etc/trcr` and `/etc/trcr-container` stay, with your license. To start from
 scratch, also remove `/etc/trcr`; the setup job writes it again from what's
-in `/etc/trcr-container`. On a remote agent, remove just the two
+in `/etc/trcr-container`. If your license came by email, it's only in
+`/etc/trcr`, so copy `/etc/trcr/license.lic` to
+`/etc/trcr-container/license.lic` first. On a remote agent, remove just the two
 `trcr-agent-*` volumes; there is no network.
 
 ## macOS and Docker Desktop
