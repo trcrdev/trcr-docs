@@ -37,22 +37,37 @@ each store failed.
 ## Passwords and tokens
 
 Keep passwords and tokens out of `master.yaml`. Each store reads its secret
-from an environment variable that you name with a `*_env` setting. To supply
-the variable, put it in a file only root and the `trcr` group can read, and
-point the master's service at it with a systemd drop-in:
+from an environment variable that you name with a `*_env` setting, such as
+`password_env: TRCR_PG_PASSWORD`. Put the variable in `/etc/trcr/master.env`,
+one `NAME=value` per line. The master's service reads that file when it
+starts.
+
+To add or change a secret, run this on the **master**. The second line makes
+the file readable by root and the `trcr` group only:
 
 ```bash
-sudo install -m 0640 -o root -g trcr /dev/null /etc/trcr/postgres.env
-echo 'TRCR_PG_PASSWORD=your-password' | sudo tee /etc/trcr/postgres.env >/dev/null
-sudo systemctl edit trcrd-master
+sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
+sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
+sudo trcrd validate
+sudo systemctl restart trcrd-master
 ```
+
+`validate` checks that every variable your stores name is set by a file the
+master's service reads. If one isn't, it says which variable and which file to
+put it in.
+
+A master installed by an older installer may not read `master.env` yet. To
+check, run `sudo systemctl show trcrd-master -p EnvironmentFiles`. If
+`/etc/trcr/master.env` isn't listed, run `sudo systemctl edit trcrd-master`
+and add:
 
 ```ini
 [Service]
-EnvironmentFile=/etc/trcr/postgres.env
+EnvironmentFile=-/etc/trcr/master.env
 ```
 
-The all-in-one install and `--postgres-dsn` do exactly this for you.
+The all-in-one install and `--postgres-dsn` keep the database password in
+`/etc/trcr/postgres.env` and connect that file to the service for you.
 
 ## PostgreSQL
 

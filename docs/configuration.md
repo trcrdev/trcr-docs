@@ -13,6 +13,8 @@ settings you set once.
 | `/etc/trcr/conf.d/*.yaml` | Fragments: probes, inventory and alert rules. Most of your edits go here. |
 | `/etc/trcr/examples/` | Annotated reference copies of every example, matching the installed version. Refreshed on every install or upgrade, so read them but don't edit them. |
 | `/etc/trcr/license.lic` | The license. |
+| `/etc/trcr/master.env` | Secrets for the master, as `NAME=value` lines: the variables your `*_env` settings name. The master's service reads it. Root and the `trcr` group only. |
+| `/etc/trcr/postgres.env` | The database password, on an all-in-one or `--postgres-dsn` install. Written by the installer. |
 | `/var/lib/trcr/` | State: your deployment's certificate authority, agent certificates and saved state. Back this up on the master. |
 
 ## How the configuration is put together
@@ -50,30 +52,54 @@ To check your changes without touching the running master, run:
 sudo trcrd validate --config /etc/trcr/master.yaml
 ```
 
-It loads everything the way the service does and reports every problem at
-once. It doesn't need the service to be stopped. It skips checks that need the
-real host, so you can also run it on another machine or in a pipeline. Add
-`--mode master` or `--mode agent` to insist on one.
+It loads everything the way the service does, then checks the things that
+would stop the master on this host. It doesn't need the service to be stopped.
+Add `--mode master` or `--mode agent` to insist on one.
 
 When everything is fine, you'll see something like this:
 
 ```
 config OK: mode=master node_id=web-01 probes=7 backends=1 inventory=0 alerting_rules=0 fragments=2
-note: license entitlements not checked (pass --license <file.lic> to preview bundle/monitor-cap/expiry enforcement)
+license OK: id=… tier=free expires=…
+  bundle performance   0/10 monitors configured
+  bundle reachability  4/20 monitors configured
+  bundle routing       0/5 monitors configured
+  bundle web           3/15 monitors configured
+  agent_limit: 5
 Restart the master to apply changes: sudo systemctl restart trcrd-master
 ```
 
-To check your probes against your license's bundles and target limits as well,
-add `--license /etc/trcr/license.lic`.
+- `license OK` means the installed license is valid and your probes fit its
+  bundles and target limits. Without a license file yet, you'll see
+  `note: license entitlements not checked` instead. To check against a license
+  file you haven't installed, add `--license <file>`.
+- The `Restart the master` line appears only when a configuration file or the
+  license changed after the running master started. If it's missing, the
+  running master already has what you checked, or the master isn't running.
 
-Run as root, `validate` also checks that the `trcr` user can read every file.
-If one is unreadable, it says so, gives you the fix, and exits with status 1:
+When something is wrong, `validate` lists every problem together, ends with a
+count, and exits with status 1. It doesn't print `config OK`. Configuration
+errors start with `error:` and name the file. Problems with the host start with
+`warning:` and say how to fix them. For example:
 
 ```
 warning: /etc/trcr/conf.d/probes.yaml is owned by root:root with mode 0640, which the trcr service user cannot read
   fix: sudo chgrp trcr /etc/trcr/conf.d/probes.yaml && sudo chmod 0640 /etc/trcr/conf.d/probes.yaml
-trcrd validate: 1 file(s) are not readable by the trcr service user; the master would fail to start
+warning: backend "postgres-main" reads its password from $TRCR_PG_PASSWORD, but no EnvironmentFile of trcrd-master sets it; put TRCR_PG_PASSWORD=... in /etc/trcr/master.env (mode 0640, group trcr)
+trcrd validate: 2 problem(s); the master would not run correctly
 ```
+
+The host checks are:
+
+- Run as root, that the `trcr` user can read `master.yaml`, every file in
+  `conf.d` and the license file.
+- That every variable a `*_env` setting names is set by one of the master
+  service's `EnvironmentFile`s, and that the files it requires exist. See
+  [Storing results](backends.md#passwords-and-tokens).
+
+On another machine or in a pipeline, there's no master service to look at, so
+`validate` checks the variables in its own environment instead. Export them
+there, or expect a warning for each one.
 
 ## Apply a change
 

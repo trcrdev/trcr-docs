@@ -209,11 +209,12 @@ master skips that store at startup and logs an `ERROR` with a `fix` field:
 warning: backend "postgres-main" reads its password from $TRCR_PG_PASSWORD, but no EnvironmentFile of trcrd-master sets it; put TRCR_PG_PASSWORD=... in /etc/trcr/master.env (mode 0640, group trcr)
 ```
 
-To fix it, put the variable in `/etc/trcr/master.env` and restart the master:
+To fix it, put the variable in the file the warning names, which is
+`/etc/trcr/master.env` on a current install, and restart the master:
 
 ```bash
-sudo install -m 0640 -o root -g trcr /dev/null /etc/trcr/master.env
-sudoedit /etc/trcr/master.env          # TRCR_PG_PASSWORD=your-password
+sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
+sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
 sudo systemctl restart trcrd-master
 ```
 

@@ -70,19 +70,20 @@ that.
 
 Settings ending in `_env` name an environment variable to read the secret
 from: `password_env`, `token_env`, `api_key_env`, `url_env`,
-`auth_passphrase_env` and so on. Put the values in a file only root and the
-`trcr` group can read, and load it with a systemd drop-in:
+`auth_passphrase_env` and so on. On the master, put the values in
+`/etc/trcr/master.env`, which the master's service reads, and keep it readable
+by root and the `trcr` group only:
 
 ```bash
-sudo install -m 0640 -o root -g trcr /dev/null /etc/trcr/secrets.env
-sudoedit /etc/trcr/secrets.env          # NAME=value, one per line
-sudo systemctl edit trcrd-master
+sudoedit /etc/trcr/master.env          # NAME=value, one per line
+sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
+sudo trcrd validate
 ```
 
-```ini
-[Service]
-EnvironmentFile=/etc/trcr/secrets.env
-```
+`validate` warns about any variable the master needs that no file of its
+service sets.
+If your master's service doesn't read `master.env` yet, see
+[Storing results](backends.md#passwords-and-tokens).
 
 ### Encrypted values
 
