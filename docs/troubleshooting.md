@@ -323,8 +323,10 @@ the restart. That doesn't mean the master has loaded it.
 
 ### The log says the TRCR API is refusing the license
 
-The master checks in with `api.trcr.dev` about once an hour. After three
-refused check-ins in a row, it logs this `ERROR`:
+The master checks in with `api.trcr.dev` when it starts and about once an
+hour after that. A refused check-in is tried again a minute later, then two
+minutes after that. After three refused check-ins in a row, it logs this
+`ERROR`, so on a first start you'll see it within a few minutes:
 
 ```
 heartbeat: the TRCR API is refusing this license (<code>: <detail>); monitoring continues unaffected — run `trcrd license status`, and contact support@trcr.dev if the license should be valid

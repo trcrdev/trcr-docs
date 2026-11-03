@@ -113,7 +113,10 @@ not a misleading `installed license: none`. You'll see something like this:
 ```
 installed license: /etc/trcr/license.lic (id=… tier=free expires=…)
 last heartbeat:    2026-11-03 02:11 UTC — ok
+pending request:   none
 ```
+
+`pending request:` shows a license request you haven't claimed yet, or `none`.
 
 The `last heartbeat:` line is the outcome of the master's most recent check-in
 with `api.trcr.dev`:
@@ -180,10 +183,13 @@ The line looks like this:
 heartbeat: the TRCR API is refusing this license (<code>: <detail>); monitoring continues unaffected — run `trcrd license status`, and contact support@trcr.dev if the license should be valid
 ```
 
-The master logs it after three refused check-ins in a row. Your monitoring
-isn't affected. Run `sudo trcrd license status` and look at the
-`last heartbeat:` line. If it says `refused` and the license should be valid,
-email support@trcr.dev with the code and detail it shows.
+The master checks in when it starts and about once an hour after that. A
+refused check-in is tried again a minute later, then two minutes after that,
+and the master logs this line after three refusals in a row. So on a first
+start, you'll see it within a few minutes. Your monitoring isn't affected.
+Run `sudo trcrd license status` and look at the `last heartbeat:` line. If it
+says `refused` and the license should be valid, email support@trcr.dev with
+the code and detail it shows.
 
 ### Move a license to another host
 
