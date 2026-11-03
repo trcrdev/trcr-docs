@@ -106,7 +106,9 @@ any request that's still waiting, run:
 sudo trcrd license status
 ```
 
-You'll see something like this:
+It needs `sudo`: run as an ordinary user, it prints only
+`trcrd license: cannot read /etc/trcr/master.yaml (permission denied) — run it with sudo`,
+not a misleading `installed license: none`. You'll see something like this:
 
 ```
 installed license: /etc/trcr/license.lic (id=… tier=free expires=…)
