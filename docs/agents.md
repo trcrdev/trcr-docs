@@ -73,8 +73,35 @@ Things worth knowing about the join command:
 - Pasting the same command twice is harmless. On a host that's already
   enrolled, the installer says `This host is already enrolled as <name>.` and
   only makes sure the service is installed and running.
+- If the master is still starting when the agent tries to enroll, the agent
+  prints `waiting for the master at 192.0.2.10:8444 ...` and keeps trying for
+  20 seconds.
+- An agent that runs in a container takes the token and the CA hash as two
+  environment lines instead. Print them on the master with
+  `sudo trcrd enroll-agent --env`. See [Containers](containers.md).
 
-If enrollment fails, the installer says so and tells you what to try:
+If the master already has an agent with the same name, it refuses the
+enrollment and the installer says:
+
+```
+error: The master already has an agent with this name. On the master run:
+         sudo trcrd agents remove web-02
+```
+
+That usually means the host was enrolled before, then uninstalled or rebuilt,
+and the master still has its record. On the **master**, remove the old record:
+
+```bash
+sudo trcrd agents remove web-02 --yes
+```
+
+Then run the same join command on the agent again. A refused attempt doesn't
+use up the token, so the command works for the rest of its hour. To keep the
+old record and enroll under a new name instead, add `--node-id <other-name>`
+to the join command.
+
+If enrollment fails for any other reason, the installer says so and tells you
+what to try:
 
 ```
 error: This host could not enroll with the master.
@@ -84,11 +111,10 @@ error: This host could not enroll with the master.
        port 8444:  nc -vz 192.0.2.10 8444
 ```
 
-Do what it says. A failed attempt leaves nothing behind that gets in the way of
-the next one, so you can paste a new command straight away. If `nc` can't
-connect, the master's port 8444 is closed or the address is one the agent can't
-reach. If you've hit the license's agent limit, the master's log says so (see
-above).
+Do what it says. The agent host keeps nothing from a failed attempt, so you can
+paste a new command straight away. If `nc` can't connect, the master's port
+8444 is closed or the address is one the agent can't reach. If you've hit the
+license's agent limit, the master's log says so (see above).
 
 ## Pair an agent the master can reach
 
@@ -123,7 +149,7 @@ for the agent to report in (60 seconds by default; change it with `--timeout`)
 and prints:
 
 ```
-enrolled web-03 (203.0.113.7)
+enrolled web-03 (203.0.113.7:8445)
 ```
 
 If the agent's address in the printed command isn't the one the master uses to
@@ -219,11 +245,16 @@ sudo trcrd leave
 
 Then enroll it with the new master in either of the two ways above.
 
-`trcrd leave` tells the old master first, while the agent's certificate still
-works. Then it stops the service and deletes the agent's certificate and
-`agent.yaml`. If the master can't be reached, nothing is deleted. For a master
-that's gone for good, add `--local-only`. To keep `agent.yaml`, add
-`--keep-config`.
+`trcrd leave` shows the agent's name and its master, and asks you to confirm.
+It tells the old master first, while the agent's certificate still works. Then
+it stops the service and deletes the agent's certificate and `agent.yaml`. If
+the master can't be reached, nothing is deleted. For a master that's gone for
+good, add `--local-only`. To keep `agent.yaml`, add `--keep-config`.
+
+This works the same for an agent enrolled with a pairing code. Its master's
+address isn't in `agent.yaml`, so `leave` uses the one the agent recorded when
+it was paired, and says so:
+`master: 192.0.2.10:8443 (recorded at the pairing enrollment)`.
 
 If you rebuilt the master and paste its new join command on an old agent, the
 agent sees the different `--ca-hash`, says
@@ -232,8 +263,12 @@ agent sees the different `--ca-hash`, says
 To see which master a host belongs to, run this on the agent:
 
 ```bash
-grep master_addr /etc/trcr/agent.yaml
+sudo grep master_addr /etc/trcr/agent.yaml
 ```
+
+An agent enrolled with a pairing code has no `master_addr` line. For one of
+those, `sudo trcrd leave` shows the master at the top of its question; answer
+`n` to change nothing.
 
 ## Retire an agent
 
@@ -245,10 +280,12 @@ sudo trcrd agents remove <name>    # on the master: delete the record
 sudo trcrd leave                   # on the agent: undo the enrollment
 ```
 
-Both `revoke` and `remove` ask you to confirm; add `--yes` to skip the
-question. Revoking takes effect on a running master within seconds, with no
-restart. The agent is refused on its next call, even though its certificate
-hasn't expired.
+Both `revoke` and `remove` ask you to confirm; add `--yes` after the name to
+skip the question. If you answer no, they print
+`aborted (nothing changed; pass --yes to skip the prompt)` and exit with
+status 1, so a script can tell. Revoking takes effect on a running master
+within seconds, with no restart. The agent is refused on its next call, even
+though its certificate hasn't expired.
 
 - `revoke` keeps the record, so you can see later that the agent was retired.
   You can enroll a new agent under the same name; it gets a new certificate,
@@ -256,5 +293,6 @@ hasn't expired.
 - `remove` deletes the record and frees the name.
 - Neither command touches the agent host. Run `sudo trcrd leave` there, or
   uninstall TRCR from it (see [Operations](operations.md#uninstall-trcr)).
+  Both work for agents enrolled with a join command or a pairing code.
 
 Revoked and removed agents no longer count toward your license's agent limit.
