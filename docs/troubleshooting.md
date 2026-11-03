@@ -11,8 +11,9 @@ sudo trcrd validate --config /etc/trcr/master.yaml
 ```
 
 If the problem happened during an install, read `/var/log/trcr-install.log`
-first. It holds the full output of every installer run, including the package
-manager's and `finish-setup.sh`'s.
+first. It holds every installer run: the installer's own `==>` lines and
+warnings, the package managers' output, and everything `finish-setup.sh`
+printed.
 
 A healthy master logs almost nothing but `INFO` lines. A `WARN` or `ERROR`
 line is worth reading, and most of them name the fix. See
@@ -71,7 +72,10 @@ them too.
 `finish-setup.sh` says `You are all set` only when the master opened its
 results store, probes are configured and the local agent is running. Otherwise
 it ends with one of these. Fix what it names, then run
-`sudo /etc/trcr/finish-setup.sh` again; it's safe to repeat.
+`sudo /etc/trcr/finish-setup.sh` again; it's safe to repeat. When this happens
+during the install itself, the installer ends with
+`Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh` and
+exits with status 1.
 
 `Nothing is measured yet: no probes are configured.` Everything runs, but there
 are no probes. To start from the samples, run the three commands it prints:
@@ -84,8 +88,9 @@ sudo systemctl restart trcrd-master
 
 `The master did not start.` The setup waited up to 45 seconds, and the master
 either stopped or never started listening. The next line is the master's own
-last error. If it says `permission denied` on a file, the `trcr` user can't
-read it, and the setup prints the fix, for example:
+last error, without the `(trcrd runs as user trcr; fix: …)` part the log
+carries, because the setup prints the fix itself. If it says
+`permission denied` on a file, the `trcr` user can't read it, for example:
 
 ```
 The trcr service user cannot read /etc/trcr/license.lic. To fix that and try again:
@@ -96,12 +101,29 @@ The trcr service user cannot read /etc/trcr/license.lic. To fix that and try aga
 `The master is running, but it is not saving results anywhere, so they are
 being thrown away.` The master started, but a results store didn't open. The
 `Its log says:` line quotes the reason, such as a wrong password or a database
-it can't reach. The lines after it say where
-the fix goes: the password in `/etc/trcr/postgres.env`, a password variable in
-`/etc/trcr/master.env` (see
+it can't reach; a database error is cut at its `(SQLSTATE …)` code. The lines
+after it say where the fix goes: the password in `/etc/trcr/postgres.env`, a
+password variable in `/etc/trcr/master.env` (see
 [A results store's password doesn't reach the master](#a-results-stores-password-doesnt-reach-the-master)),
-or a `backends:` entry in `master.yaml`. Then restart the master and run
-`finish-setup.sh` again.
+or a `backends:` entry in `master.yaml`. If the database couldn't be reached
+at all (`connection refused`, `no such host`, a timeout or a TLS error), it
+says:
+
+```
+    Fix the database, or the sslmode/host in the dsn: line of /etc/trcr/master.yaml (a database without TLS needs sslmode=disable), then:
+    (Or run the installer again with the corrected --postgres-dsn; it updates that line and restarts the master.)
+```
+
+The second line appears when the installer wrote that entry. Otherwise
+restart the master and run `finish-setup.sh` again.
+
+`The master and a local agent are running, but the master has not said which
+results store it opened, so whether results are being saved is not known
+yet.` On a host without `psql`, the setup can't look for rows, so it relies on
+the master's log. It waits up to 10 seconds after a fresh start for the master
+to report its stores. If it hasn't by then, you get this instead of
+`You are all set`. Look in a minute with `sudo journalctl -u trcrd-master -n 30`:
+`backend ready` means results are being saved, `DISCARDED` means they aren't.
 
 `The master is running, but the local agent is not.` The agent's log says why:
 run `sudo journalctl -u trcrd-agent -n 30`.
@@ -136,17 +158,26 @@ fails, `finish-setup.sh` ends with `The master is running, but it is not saving
 results anywhere` and quotes the database's error. See
 [The install ends without `You are all set`](#the-install-ends-without-you-are-all-set).
 
+A TLS error, or a connection the server closes at once, usually means the
+database has no TLS while the URL says `sslmode=require`. Run the installer
+again with the same options and `sslmode=disable` in the URL. It updates the
+`dsn:` line it wrote in `master.yaml`, says
+`Updated the database address in /etc/trcr/master.yaml.`, and restarts the
+master if it's running.
+
 If the installer says `--postgres-dsn has a password in it`, take
 `:PASSWORD` out of the URL and give the password with
 `--postgres-password-file` or `--postgres-password-env` instead.
 
 ### A `trcrd` command says `run it with sudo`
 
-Commands such as `trcrd agents`, `trcrd probes` and `trcrd validate` read the
-master's files, which only root and the `trcr` group can read. Run as an
-ordinary user, they stop with a line like
-`trcrd agents: cannot read /etc/trcr/master.yaml (permission denied) — run it with sudo`.
-Put `sudo` in front and run it again.
+Commands such as `trcrd agents`, `trcrd probes`, `trcrd validate` and
+`trcrd license status` read the master's files, which only root and the
+`trcr` group can read. Run as an ordinary user, they stop with a line like
+`trcrd agents: cannot read /etc/trcr/master.yaml (permission denied) — run it with sudo`,
+and nothing else: `license status` in particular doesn't print
+`installed license: none` first. On a host without `sudo`, the line ends with
+`run it as root` instead. Put `sudo` in front and run it again.
 
 ## The master
 
@@ -210,18 +241,20 @@ warning: backend "postgres-main" reads its password from $TRCR_PG_PASSWORD, but 
 ```
 
 To fix it, put the variable in the file the warning names, which is
-`/etc/trcr/master.env` on a current install, and restart the master:
+`/etc/trcr/master.env` on a current install, and restart the master. The
+installer creates that file with the right permissions, so there's nothing to
+`chmod`:
 
 ```bash
 sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
-sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
 sudo systemctl restart trcrd-master
 ```
 
 If `validate` says the unit has no `EnvironmentFile=` at all, your master's
-service file is older than `master.env`. Add the line it gives with
-`sudo systemctl edit trcrd-master`. See
-[Storing results](backends.md#passwords-and-tokens).
+service file is older than `master.env`. Run the installer again: it keeps
+the service file and adds a drop-in, saying
+`Added /etc/systemd/system/trcrd-master.service.d/10-trcr.conf so the kept service file reads /etc/trcr/master.env.`
+See [Storing results](backends.md#passwords-and-tokens).
 
 ### The master fails with `203/EXEC` on an SELinux host
 
@@ -246,9 +279,9 @@ sudo journalctl -u trcrd-master | grep -iE "discard|backend"
 ```
 
 On an all-in-one host, `finish-setup.sh` waits up to 90 seconds for the first
-results. If none arrive, it says
-`No results have reached the database after 90 seconds` and lists the commands
-that usually show why.
+results, and stops waiting about ten seconds after the first row arrives. If
+none arrive, it says `No results have reached the database after 90 seconds`
+and lists the commands that usually show why.
 
 Check these, in order:
 
@@ -298,16 +331,18 @@ support@trcr.dev with the code and detail. See
 
 If the installer says `The master already has an agent with this name.`, the
 master still has a record under that name, often from an earlier install of
-the same host. On the **master**, remove it, then run the same join command on
-the agent again:
+the same host. The installer prints the fix:
 
-```bash
-sudo trcrd agents remove <name> --yes
+```
+error: The master already has an agent with this name. On the master run:
+         sudo trcrd agents remove web-02 --yes
+       Then run this same command again; the token was not spent.
 ```
 
-The refused attempt didn't use up the token, so the same command works for the
-rest of its hour. To keep the old record instead, add `--node-id <other-name>`
-to the join command.
+Run the `remove` command on the **master**, then the same join command on the
+agent again. The refused attempt didn't use up the token, so it works for the
+rest of its hour, and the agent host keeps nothing from the attempt. To keep
+the old record instead, add `--node-id <other-name>` to the join command.
 
 Otherwise the installer prints `This host could not enroll with the master.`
 The agent host keeps nothing from a failed attempt, so you can retry straight
@@ -333,7 +368,29 @@ healthy and can't be reached.
 ### An agent is stuck at `never-seen`
 
 The agent enrolled, then never made a successful call. `trcrd agents` prints
-the usual causes under the table. Most likely first:
+the usual causes under the table, in the same order as this page:
+
+```
+NODE_ID       STATUS      LAST SEEN  PROBES  CERT EXPIRES
+web-01-local  up          12s ago    8       in 364d
+web-02        never-seen  never      8       in 364d
+
+2 agent(s); down-after 1m30s; 1 not reporting
+
+web-02 enrolled but never checked in. Usual causes, most common first:
+  1. master.advertise_addr is unset or not reachable from the agent — the
+     master's serving cert then covers only localhost, so agents enroll
+     (trust-on-first-use) and every mTLS call after fails. Agent log:
+     'certificate is valid for 127.0.0.1'.
+  2. Port 8443 (master.listen_addr) is closed between the agent and the master
+     — enrollment on port 8444 got through, nothing else can. Agent log:
+     'probe config initial fetch failed ... connection refused'.
+  3. The agent service is not running on that host: systemctl status trcrd-agent
+     there.
+  Check the agent host: journalctl -u trcrd-agent -n 30
+```
+
+Most likely first:
 
 1. `master.advertise_addr` isn't set, or is wrong. The master's certificate is
    then valid only for connections from its own host, so every call after
