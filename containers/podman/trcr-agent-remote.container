@@ -1,0 +1,33 @@
+# Podman quadlet: a TRCR agent on a host that is NOT the master's.
+#
+# On the master, create its token and CA hash:
+#   podman exec trcr-master trcrd enroll-agent --env
+# and put the two lines it prints in /etc/trcr-container/agent.env (root
+# only, mode 0600) together with the master's enrollment address:
+#   TRCR_JOIN=<master-host>:8444
+# then: systemctl daemon-reload && systemctl start trcr-agent-remote
+#
+# The agent enrolls on its first start under this host's name and keeps
+# its identity in its volumes. The token is single-use; delete it from
+# agent.env once the master lists the agent.
+[Unit]
+Description=TRCR agent
+
+[Container]
+Image=ghcr.io/trcrdev/trcrd:v26.11.0
+ContainerName=trcr-agent
+HostName=%H
+Exec=agent --config /etc/trcr/agent.yaml
+Network=host
+EnvironmentFile=/etc/trcr-container/agent.env
+Volume=trcr-agent-etc.volume:/etc/trcr
+Volume=trcr-agent-state.volume:/var/lib/trcr
+DropCapability=ALL
+AddCapability=NET_RAW
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

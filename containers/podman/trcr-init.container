@@ -1,0 +1,41 @@
+# Podman quadlet: one-shot setup for the TRCR stack, run before everything
+# else and again at every boot (it only redoes what is missing). It
+# generates the Postgres and Grafana passwords, writes the master's
+# config and starter probes into /etc/trcr, installs the license and sets
+# up Grafana's datasource and dashboards.
+#
+# Needs on the host, before the first start:
+#   /etc/trcr-container/setup.env   TRCR_ADVERTISE_ADDR=<host>:8444 and,
+#                                   without a license file, TRCR_LICENSE_EMAIL=
+#   /etc/trcr-container/license.lic your license (or request one by email)
+#   /etc/trcr/                      the master's config dir (may be empty)
+#
+# Runs as root with the five capabilities it needs to chown and to run
+# trcrd as uid 65532; nothing stays running afterwards.
+[Unit]
+Description=TRCR container setup
+
+[Container]
+Image=ghcr.io/trcrdev/trcrd:v26.11.0
+ContainerName=trcr-init
+HostName=trcr-master
+Exec=container-init
+User=0
+DropCapability=ALL
+AddCapability=CHOWN DAC_OVERRIDE FOWNER SETUID SETGID
+NoNewPrivileges=true
+EnvironmentFile=/etc/trcr-container/setup.env
+Volume=/etc/trcr:/etc/trcr:z
+Volume=/etc/trcr-container:/setup:ro,z
+Volume=trcr-secrets.volume:/run/trcr-secrets
+Volume=trcr-grafana-provisioning.volume:/grafana/provisioning
+Volume=trcr-grafana-dashboards.volume:/grafana/dashboards
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Requesting a license by email waits for the link to be clicked.
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target

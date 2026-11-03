@@ -1,0 +1,41 @@
+# TRCR agent on another host, joining a master that runs elsewhere.
+# The walk-through is docs/containers.md.
+#
+# On the master, create the agent's token and CA hash:
+#   docker compose exec trcr-master trcrd enroll-agent --env
+# and put its two lines in .env next to this file, together with
+#   TRCR_JOIN=<master-host>:8444     the master's enrollment address
+#   TRCR_NODE_ID=<name>              this agent's name (default trcr-agent-2)
+# then: docker compose -f compose.agent.yml up -d
+#
+# The agent enrolls on its first start and keeps its identity in its
+# volumes; the token is single-use and expires after an hour, so delete it
+# from .env once `trcrd agents` on the master lists this agent.
+name: trcr-agent
+
+services:
+  trcr-agent:
+    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:v26.11.0}
+    hostname: ${TRCR_NODE_ID:-trcr-agent-2}
+    command: ["agent", "--config", "/etc/trcr/agent.yaml"]
+    restart: unless-stopped
+    # Starts as root only to hand NET_RAW (ping and traceroute) to uid
+    # 65532 as an ambient capability; trcrd itself never runs as root.
+    user: "0:0"
+    cap_drop: [ALL]
+    cap_add: [NET_RAW, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    # Host networking: measurements come from this host's own interfaces.
+    network_mode: host
+    environment:
+      TRCR_JOIN: ${TRCR_JOIN:?put TRCR_JOIN=<master-host>:8444 in .env}
+      TRCR_NODE_ID: ${TRCR_NODE_ID:-trcr-agent-2}
+      TRCR_ENROLL_TOKEN: ${TRCR_ENROLL_TOKEN:-}
+      TRCR_CA_HASH: ${TRCR_CA_HASH:-}
+    volumes:
+      - trcr_agent_etc:/etc/trcr
+      - trcr_agent_state:/var/lib/trcr
+
+volumes:
+  trcr_agent_etc:
+  trcr_agent_state:

@@ -1,154 +1,78 @@
-# TRCR — Compose stack for Docker Compose v2 and Podman Compose.
+# TRCR in containers: master, local agent, PostgreSQL results store and
+# Grafana on one host, with one `docker compose up -d` (Docker Compose v2
+# or podman-compose). The walk-through is docs/containers.md.
 #
-# One master, one agent and a PostgreSQL results store on a single host.
-# The walk-through is docs/containers.md in this repository; the short
-# version is below. Image: ghcr.io/trcrdev/trcrd. Pin a release with
-# TRCR_IMAGE=ghcr.io/trcrdev/trcrd:<release> in .env.
+# What you need in .env, next to this file:
+#   TRCR_ADVERTISE_ADDR=<host>:8444   the address agents on other machines
+#                                     use to reach this master
+# and a license: either copy your license.lic next to this file, or set
+#   TRCR_LICENSE_EMAIL=you@example.com   (TRCR_LICENSE_COMPANY optional)
+# to request a free one; the first start then waits for you to click the
+# emailed link. Everything else is generated or has a default:
+#   TRCR_IMAGE          the trcrd image (pinned release tag below)
+#   TRCR_PORT_API       8443   mTLS API agents talk to
+#   TRCR_PORT_ENROLL    8444   enrollment listener
+#   TRCR_PORT_METRICS   9101   Prometheus metrics, published on 127.0.0.1 only
+#   TRCR_GRAFANA_PORT   3000   Grafana, published on 127.0.0.1 only
 #
-#   1. Config directory, owned by the image's unprivileged user (uid 65532).
-#      The master writes its licence there, so it is not read-only.
+# Then: docker compose up -d
 #
-#        mkdir -p etc && sudo chown 65532:65532 etc
-#        echo "TRCR_PG_PASSWORD=$(openssl rand -hex 16)" > .env
+# Services: trcr-init (one-shot setup: secrets, master config, starter
+# probes, license, Grafana provisioning), trcr-results-pg (PostgreSQL),
+# trcr-master, trcr-enroll (one-shot: a token for the local agent),
+# trcr-agent-1 (on the host network, so it measures from this host) and
+# trcr-grafana with the TRCR dashboards. Remove trcr-grafana if you have
+# your own Grafana, and trcr-agent-1 if this host should not measure.
 #
-#   2. Starter master config. --advertise-addr is the address AGENTS dial,
-#      so it must be this host as agents see it, not the container.
-#
-#        docker compose run --rm trcr-master init \
-#            --advertise-addr trcr-master.example.com:8444 \
-#            --health-listen-addr 127.0.0.1:8081 \
-#            --postgres-dsn 'postgres://trcr@trcr-results-pg:5432/trcr_results?sslmode=disable' \
-#            --postgres-password-env TRCR_PG_PASSWORD
-#
-#   3. Licence (free tier, self-serve). --wait blocks until the emailed
-#      verification link is clicked, then installs /etc/trcr/license.lic.
-#      Holding a licence file already? Copy it to etc/license.lic instead.
-#
-#        docker compose run --rm trcr-master license request \
-#            --email you@example.com --company "Your Co" --yes --wait
-#
-#   4. docker compose up -d trcr-results-pg trcr-master
-#
-#   5. An enrolment token and CA hash for the agent (valid one hour):
-#
-#        docker compose exec trcr-master trcrd enroll-agent
-#
-#      Put the --token value in TRCR_ENROLL_TOKEN and the --ca-hash value
-#      in TRCR_CA_HASH in .env, then:
-#
-#        docker compose up -d trcr-agent-1
-#
-#      The agent enrols on its first start and keeps its identity in its
-#      state volume, so restarts do not re-enrol.
-#
-#   6. docker compose exec trcr-master trcrd agents      # the agent shows up
-#
-# Notes:
-#
-#   * hostname: is pinned on the master. The licence is bound to a machine
-#     fingerprint that is derived from the hostname inside a container, so
-#     a random container ID would change it on every recreate.
-#   * NET_RAW is what ping, batch ping and traceroute need. The master runs
-#     probes too, so both services have it. Drop it from a service that
-#     only runs TCP, HTTP, DNS or SSL probes.
-#   * The agent uses host networking so its measurements come from the
-#     host's own interfaces and traceroute sees real hops rather than the
-#     Compose bridge. To use the bridge instead, remove network_mode, add
-#     `networks: [trcr_net]`, and set TRCR_JOIN=trcr-master:8444.
-#   * :Z on the bind mounts is for SELinux hosts (Podman on Fedora, RHEL).
-#     Docker ignores it where SELinux is not enforcing.
-#   * Rootless Podman: ping works, traceroute does not (the user-mode
-#     network stack does not return TTL-exceeded replies). Run agents that
-#     traceroute as root, or install the agent on the host instead.
+# The trcrd containers start as root only to hand NET_RAW (ping and
+# traceroute) to uid 65532 as an ambient capability; trcrd itself never
+# runs as root. The master's hostname is pinned because the license is
+# bound to a fingerprint derived from it; do not change it later.
+name: trcr
+
+x-trcrd: &trcrd
+  image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:v26.11.0}
+  restart: unless-stopped
+  user: "0:0"
+  cap_drop: [ALL]
+  cap_add: [NET_RAW, SETUID, SETGID]
+  security_opt: ["no-new-privileges:true"]
 
 services:
-  # -------------------------------------------------------------------------
-  # Master — holds the CA, schedules probes, collects results.
-  # -------------------------------------------------------------------------
-  trcr-master:
-    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:latest}
-    container_name: trcr-master
+  trcr-init:
+    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:v26.11.0}
+    command: ["container-init"]
+    user: "0:0"
+    restart: "no"
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
     hostname: trcr-master
-    restart: unless-stopped
-    command: ["master", "--config", "/etc/trcr/master.yaml"]
-    depends_on:
-      trcr-results-pg:
-        condition: service_healthy
     environment:
-      # Read by the postgres backend (backends[].password_env), so the
-      # credential never sits in master.yaml.
-      TRCR_PG_PASSWORD: ${TRCR_PG_PASSWORD:?set TRCR_PG_PASSWORD in .env}
-    cap_drop: [ALL]
-    cap_add: [NET_RAW]
-    security_opt:
-      - no-new-privileges:true
+      TRCR_ADVERTISE_ADDR: ${TRCR_ADVERTISE_ADDR:?put TRCR_ADVERTISE_ADDR=<host>:8444 in .env, the address agents on other machines dial}
+      TRCR_LICENSE_EMAIL: ${TRCR_LICENSE_EMAIL:-}
+      TRCR_LICENSE_COMPANY: ${TRCR_LICENSE_COMPANY:-}
+      TRCR_GRAFANA_PORT: ${TRCR_GRAFANA_PORT:-3000}
     volumes:
-      - ./etc:/etc/trcr:Z
-      - trcr_master_state:/var/lib/trcr
-    ports:
-      - "8443:8443"            # mTLS API (agents POST results, GET probe config)
-      - "8444:8444"            # enrolment listener (token bootstrap)
-      - "127.0.0.1:9101:9101"  # Prometheus /metrics, loopback only
-    networks:
-      - trcr_net
-    healthcheck:
-      # Needs master.health_listen_addr: 127.0.0.1:8081 in master.yaml,
-      # which the --health-listen-addr flag in step 2 writes.
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      - ./etc:/etc/trcr:z
+      - ./:/setup:ro,z
+      - trcr_secrets:/run/trcr-secrets
+      - trcr_grafana_provisioning:/grafana/provisioning
+      - trcr_grafana_dashboards:/grafana/dashboards
 
-  # -------------------------------------------------------------------------
-  # Agent — measures from this host. Enrols itself on first start.
-  # -------------------------------------------------------------------------
-  trcr-agent-1:
-    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:latest}
-    container_name: trcr-agent-1
-    hostname: trcr-agent-1
-    restart: unless-stopped
-    command: ["agent", "--config", "/etc/trcr/agent.yaml"]
-    depends_on:
-      trcr-master:
-        condition: service_healthy
-    network_mode: host
-    environment:
-      TRCR_JOIN: ${TRCR_JOIN:-127.0.0.1:8444}
-      TRCR_ENROLL_TOKEN: ${TRCR_ENROLL_TOKEN:-}
-      TRCR_CA_HASH: ${TRCR_CA_HASH:-}
-      TRCR_NODE_ID: trcr-agent-1
-    cap_drop: [ALL]
-    cap_add: [NET_RAW]
-    security_opt:
-      - no-new-privileges:true
-    volumes:
-      # Its own config and state; the entrypoint writes agent.yaml on the
-      # first start, after enrolment.
-      - trcr_agent_1_etc:/etc/trcr
-      - trcr_agent_1_state:/var/lib/trcr
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/trcrd", "version"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-
-  # -------------------------------------------------------------------------
-  # PostgreSQL results store. Point master.yaml at an existing Postgres,
-  # Elasticsearch or InfluxDB instead if you have one.
-  # -------------------------------------------------------------------------
   trcr-results-pg:
     image: postgres:18-trixie
-    container_name: trcr-results-pg
     restart: unless-stopped
+    depends_on:
+      trcr-init: {condition: service_completed_successfully}
     environment:
       POSTGRES_USER: trcr
-      POSTGRES_PASSWORD: ${TRCR_PG_PASSWORD:?set TRCR_PG_PASSWORD in .env}
       POSTGRES_DB: trcr_results
+      POSTGRES_PASSWORD_FILE: /run/trcr-secrets/pg_password
     volumes:
       - trcr_results_pg_data:/var/lib/postgresql
-    networks:
-      - trcr_net
+      - trcr_secrets:/run/trcr-secrets:ro
+    networks: [trcr_net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trcr -d trcr_results"]
       interval: 10s
@@ -156,12 +80,104 @@ services:
       retries: 5
       start_period: 5s
 
+  trcr-master:
+    <<: *trcrd
+    hostname: trcr-master
+    command: ["master", "--config", "/etc/trcr/master.yaml"]
+    depends_on:
+      trcr-init: {condition: service_completed_successfully}
+      trcr-results-pg: {condition: service_healthy}
+    environment:
+      TRCR_PG_PASSWORD_FILE: /run/trcr-secrets/pg_password
+      # Metrics bind to all interfaces inside the container so the port
+      # published below (on 127.0.0.1 of the host) answers.
+      TRCR_METRICS__PROMETHEUS_LISTEN_ADDR: 0.0.0.0:9101
+    volumes:
+      - ./etc:/etc/trcr:z
+      - trcr_master_state:/var/lib/trcr
+      - trcr_secrets:/run/trcr-secrets:ro
+    ports:
+      - "${TRCR_PORT_API:-8443}:8443"
+      - "${TRCR_PORT_ENROLL:-8444}:8444"
+      - "127.0.0.1:${TRCR_PORT_METRICS:-9101}:9101"
+    networks: [trcr_net]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Writes a one-hour enrollment token for trcr-agent-1 into a volume only
+  # the agent reads, unless the master already knows that agent. The token
+  # never appears in .env or in `docker compose config`.
+  trcr-enroll:
+    image: ${TRCR_IMAGE:-ghcr.io/trcrdev/trcrd:v26.11.0}
+    command: ["container-enroll", "trcr-agent-1", "/run/trcr-bootstrap/trcr-agent-1.env"]
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      trcr-master: {condition: service_healthy}
+    volumes:
+      - ./etc:/etc/trcr:ro,z
+      - trcr_master_state:/var/lib/trcr
+      - trcr_bootstrap:/run/trcr-bootstrap
+
+  # Measures from this host: host networking, so latency and traceroute
+  # reflect the host's own interfaces. Enrolls itself on its first start
+  # and keeps its identity in its volumes, so restarts do not enroll again.
+  trcr-agent-1:
+    <<: *trcrd
+    hostname: trcr-agent-1
+    command: ["agent", "--config", "/etc/trcr/agent.yaml"]
+    network_mode: host
+    depends_on:
+      trcr-enroll: {condition: service_completed_successfully}
+    environment:
+      TRCR_JOIN: 127.0.0.1:${TRCR_PORT_ENROLL:-8444}
+      TRCR_NODE_ID: trcr-agent-1
+      TRCR_ENROLL_FILE: /run/trcr-bootstrap/trcr-agent-1.env
+    volumes:
+      - trcr_agent_1_etc:/etc/trcr
+      - trcr_agent_1_state:/var/lib/trcr
+      - trcr_bootstrap:/run/trcr-bootstrap:ro
+
+  trcr-grafana:
+    image: grafana/grafana:12.2.1-ubuntu
+    restart: unless-stopped
+    depends_on:
+      trcr-init: {condition: service_completed_successfully}
+      trcr-results-pg: {condition: service_healthy}
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/trcr-secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/trcr/trcr-overview.json
+    volumes:
+      - trcr_grafana_data:/var/lib/grafana
+      - trcr_grafana_provisioning:/etc/grafana/provisioning:ro
+      - trcr_grafana_dashboards:/var/lib/grafana/dashboards/trcr:ro
+      - trcr_secrets:/run/trcr-secrets:ro
+    ports:
+      - "127.0.0.1:${TRCR_GRAFANA_PORT:-3000}:3000"
+    networks: [trcr_net]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
 networks:
-  trcr_net:
-    driver: bridge
+  trcr_net: {}
 
 volumes:
   trcr_master_state:
   trcr_agent_1_etc:
   trcr_agent_1_state:
   trcr_results_pg_data:
+  trcr_secrets:
+  trcr_bootstrap:
+  trcr_grafana_data:
+  trcr_grafana_provisioning:
+  trcr_grafana_dashboards:

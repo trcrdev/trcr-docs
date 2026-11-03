@@ -1,3 +1,5 @@
-# Podman quadlet: the agent's config (agent.yaml, written at first start).
+# Podman quadlet: the agent's config (agent.yaml, written at first start). Owned by the image's user so that write succeeds.
 [Volume]
 VolumeName=trcr-agent-etc
+User=65532
+Group=65532

@@ -1,0 +1,5 @@
+# Podman quadlet: the TRCR dashboards of the running release, written by trcr-init.
+[Volume]
+VolumeName=trcr-grafana-dashboards
+User=472
+Group=472

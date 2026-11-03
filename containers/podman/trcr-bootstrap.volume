@@ -1,0 +1,5 @@
+# Podman quadlet: the local agent's enrollment token, written by trcr-enroll.
+[Volume]
+VolumeName=trcr-bootstrap
+User=65532
+Group=65532

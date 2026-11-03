@@ -1,3 +1,5 @@
 # Podman quadlet: the agent's identity and state.
 [Volume]
 VolumeName=trcr-agent-state
+User=65532
+Group=65532

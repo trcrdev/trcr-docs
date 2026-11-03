@@ -1,0 +1,25 @@
+# Podman quadlet: writes a one-hour enrollment token for the local agent
+# (trcr-agent-1) into the bootstrap volume, unless the master already
+# knows that agent. Runs after the master is healthy and again at every
+# boot, where it finds the agent enrolled and does nothing.
+[Unit]
+Description=TRCR local agent enrollment token
+Requires=trcr-master.service
+After=trcr-master.service
+
+[Container]
+Image=ghcr.io/trcrdev/trcrd:v26.11.0
+ContainerName=trcr-enroll
+Exec=container-enroll trcr-agent-1 /run/trcr-bootstrap/trcr-agent-1.env
+Volume=/etc/trcr:/etc/trcr:ro,z
+Volume=trcr-master-state.volume:/var/lib/trcr
+Volume=trcr-bootstrap.volume:/run/trcr-bootstrap
+DropCapability=ALL
+NoNewPrivileges=true
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

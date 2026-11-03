@@ -1,46 +1,37 @@
-# Podman quadlet: a TRCR agent on this host.
+# Podman quadlet: the local TRCR agent, measuring from this host.
 #
-# Install as root (rootful Podman): the agent measures from the host's own
-# network stack (Network=host) so latency and traceroute reflect the host,
-# and rootless Podman cannot return traceroute's TTL-exceeded replies.
+# Host networking, so latency and traceroute reflect the host's own
+# interfaces. On its first start it reads the token trcr-enroll wrote,
+# enrolls against the master on this host and keeps its identity in its
+# volumes; later starts do not enroll again.
 #
-#   /etc/containers/systemd/trcr-agent.container   (this file)
-#   /etc/trcr/agent.env  (0600) with the values printed by
-#                        `trcrd enroll-agent` on the master:
-#       TRCR_JOIN=master.example.com:8444
-#       TRCR_ENROLL_TOKEN=TRCR-ENROLL-1....
-#       TRCR_CA_HASH=sha256:...
-# then `systemctl daemon-reload && systemctl start trcr-agent`.
-#
-# The image's entrypoint enrols on the first start (`trcrd join`) and keeps
-# the agent's identity in the state volume, so later starts do not re-enrol.
-# The token is single use; delete it from agent.env once the agent is up.
+# Rootful Podman is the supported mode: rootless Podman cannot return the
+# TTL-exceeded replies traceroute needs.
 [Unit]
-Description=TRCR agent
+Description=TRCR agent (this host)
+Requires=trcr-enroll.service
+After=trcr-enroll.service
 
 [Container]
-Image=ghcr.io/trcrdev/trcrd:latest
+Image=ghcr.io/trcrdev/trcrd:v26.11.0
 ContainerName=trcr-agent
-HostName=%H
+HostName=trcr-agent-1
 Exec=agent --config /etc/trcr/agent.yaml
 Network=host
-EnvironmentFile=/etc/trcr/agent.env
-Environment=TRCR_NODE_ID=%H
+Environment=TRCR_JOIN=127.0.0.1:8444
+Environment=TRCR_NODE_ID=trcr-agent-1
+Environment=TRCR_ENROLL_FILE=/run/trcr-bootstrap/trcr-agent-1.env
 Volume=trcr-agent-etc.volume:/etc/trcr
 Volume=trcr-agent-state.volume:/var/lib/trcr
+Volume=trcr-bootstrap.volume:/run/trcr-bootstrap:ro
 DropCapability=ALL
 # ping, batch_ping and traceroute open raw sockets. Remove if this agent
 # runs only TCP / HTTP / DNS / SSL probes.
 AddCapability=NET_RAW
 NoNewPrivileges=true
-HealthCmd=/usr/local/bin/trcrd version
-HealthInterval=60s
-HealthTimeout=5s
-HealthRetries=3
-AutoUpdate=registry
 
 [Service]
 Restart=always
 
 [Install]
-WantedBy=multi-user.target default.target
+WantedBy=multi-user.target

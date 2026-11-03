@@ -1,0 +1,5 @@
+# Podman quadlet: Grafana's own database and plugins.
+[Volume]
+VolumeName=trcr-grafana-data
+User=472
+Group=472
