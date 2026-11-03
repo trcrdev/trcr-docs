@@ -14,7 +14,9 @@ add the store yourself. See [Install TRCR](install.md).
 Yes. That's how you upgrade, on the master and on agents alike. It replaces
 `trcrd`, restarts the TRCR services that were running if the version changed,
 and leaves your configuration, license and data alone. When it's done, it says
-`Upgrade complete`. See [Operations](operations.md#upgrade-trcr).
+`Upgrade complete`. If there was nothing to upgrade and everything is running,
+it says `Nothing to do: trcrd v26.11.0 is installed and everything is running.`
+within seconds. See [Operations](operations.md#upgrade-trcr).
 
 ### Why did the install finish with nothing running?
 
