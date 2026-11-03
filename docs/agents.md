@@ -199,8 +199,9 @@ web-02        up      9s ago     8       in 364d
 ```
 
 A new agent should show `up` within a minute. `LAST SEEN` is the agent's most
-recent call to the master; for a healthy agent it stays under about 30
-seconds, like the samples above. `PROBES` is how many probes the
+recent call to the master; for a healthy agent it climbs to about half a
+minute and then drops back, and it's only a problem when it nears the
+down-after time on the last line. `PROBES` is how many probes the
 master serves to that agent, including the automatic agent-to-agent pings.
 `CERT EXPIRES` is when its certificate runs out; agents renew it by themselves
 long before then. The last line says how long an agent can be silent before it
@@ -311,7 +312,8 @@ though its certificate hasn't expired.
 - `remove` deletes the record and frees the name.
 - Neither command touches the agent host. If the agent is still installed
   there, run `sudo trcrd leave --local-only --yes` on it: it stops the agent
-  and deletes its certificate, without stopping at `Proceed? [y/N]` first.
+  and deletes its certificate and `/etc/trcr/agent.yaml`, without stopping at
+  `Proceed? [y/N]` first.
   It doesn't tell the master (plain `leave` would ask the master, which no
   longer accepts the agent). It reminds you that if the master still lists
   the agent, you remove it there with `sudo trcrd agents remove web-02 --yes`;
