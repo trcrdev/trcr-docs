@@ -57,26 +57,34 @@ dashboards, and come back here before you rely on the data.
       anything about your network.
 - [ ] Run `sudo trcrd validate --config /etc/trcr/master.yaml` after every
       edit. It reports every problem at once, names the file and the key, and
-      warns about any file the master can't read. A misspelled key is an
-      error, not something that gets ignored.
+      warns about any file the master can't read and any password variable
+      its service doesn't set. A misspelled key is an error, not something
+      that gets ignored.
 - [ ] Restart the master after every change to its configuration:
       `sudo systemctl restart trcrd-master`. The master reads its files only
-      when it starts. Agents pick up probe changes from the master by
-      themselves within a minute.
+      when it starts, and `validate` reminds you when a restart is due.
+      Agents pick up probe changes from the master by themselves within a
+      minute.
 - [ ] Monitoring private addresses? Add `allow_private_targets: true` to those
       probes, or they're refused. See
       [Probes](probes.md#private-and-internal-targets).
-- [ ] Keep passwords out of YAML. Use the `*_env` settings or
-      `trcrd encrypt-password`. See
+- [ ] Keep passwords out of YAML. Use the `*_env` settings, with the values in
+      `/etc/trcr/master.env`, or `trcrd encrypt-password`. See
       [Security](security.md#secrets-in-configuration).
+- [ ] Install files with `sudo install -o root -g trcr -m 0640`, not `cp`,
+      license included. The master runs as the `trcr` user and won't start if
+      it can't read one.
 
 ## Once it's running
 
 - [ ] `sudo trcrd agents` shows every agent as `up`.
 - [ ] `sudo trcrd probes` shows your probes and where each one runs.
 - [ ] The master's log has no line saying results are DISCARDED:
-      `sudo journalctl -u trcrd-master | grep -i discard` prints nothing. See
-      [what a healthy log looks like](operations.md#what-a-healthy-master-log-looks-like).
+      `sudo journalctl -u trcrd-master | grep -i discard` prints nothing. Read
+      any `WARN` or `ERROR` line; on a healthy master there are almost none.
+      See [what a healthy log looks like](operations.md#what-a-healthy-master-log-looks-like).
+- [ ] `sudo trcrd license status` shows `last heartbeat:` with `ok`, unless
+      you've turned check-ins off.
 - [ ] Grafana shows data in the **TRCR** folder within a few minutes.
 - [ ] Back up `/etc/trcr` and `/var/lib/trcr` on the master. The second holds
       your deployment's certificate authority; if you lose it, every agent

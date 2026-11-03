@@ -11,9 +11,10 @@ add the store yourself. See [Install TRCR](install.md).
 
 ### Is it safe to run the installer again?
 
-Yes. That's how you upgrade. It replaces `trcrd`, restarts the TRCR services
-that were running if the version changed, and leaves your configuration,
-license and data alone.
+Yes. That's how you upgrade, on the master and on agents alike. It replaces
+`trcrd`, restarts the TRCR services that were running if the version changed,
+and leaves your configuration, license and data alone. When it's done, it says
+`Upgrade complete`. See [Operations](operations.md#upgrade-trcr).
 
 ### Why did the install finish with nothing running?
 
