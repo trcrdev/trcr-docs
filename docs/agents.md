@@ -1,117 +1,186 @@
 # Agents
 
-An agent needs no email address, no licence and no registration. There are two
-ways to enrol one. Choose by which side can reach the other.
+Agents do the measuring, so you'll want them in the places you care about:
+offices, data centers, cloud regions. Adding one takes a couple of minutes and
+needs no email address or license of its own.
+
+There are two ways to add an agent. Which one you use depends on which side
+can open a connection to the other:
 
 | Situation | Use |
 |---|---|
-| The master can connect to the agent | [Pairing code](#pairing-code-the-master-reaches-the-agent) |
-| The agent is behind NAT or a firewall, and can only connect out | [Token one-liner](#token-one-liner-the-agent-reaches-the-master) |
+| The agent can reach the master. This is the usual case, and the only one that works behind NAT. | [A join command](#add-an-agent-with-a-join-command) |
+| The master can reach the agent, but not the other way round. | [A pairing code](#pair-an-agent-the-master-can-reach) |
 
-Before adding a remote agent, make sure the master has
-[`advertise_addr`](configuration.md#advertise_addr-is-required-for-remote-agents)
-set and [ports 8443 and 8444 open](install.md#firewall).
+Before you add a remote agent, check two things on the master. Ports 8443 and
+8444 must be open (see [Ports and firewalls](install.md#ports-and-firewalls)),
+and [`advertise_addr`](configuration.md#advertise_addr-is-required-for-remote-agents)
+must be an address the agent can reach.
 
-## Pairing code (the master reaches the agent)
+The master's license sets how many agents you can enroll. The free license
+allows five, and on an all-in-one host the local agent is one of them. Agents
+you've revoked don't count. When the limit is reached, the master refuses the
+next enrollment and its log says `enroll: license agent limit reached`.
 
-On the **agent** host:
+## Add an agent with a join command
 
-```bash
-curl -fsSL https://trcr.dev/install/install.sh | sh -s -- --agent
-```
-
-This installs `trcrd`, creates the `trcr` service account, and starts the agent
-in a waiting state, listening on port 8445. The install ends by printing a
-pairing code and a fingerprint:
-
-```
-Pairing code: K7QM-3XWD
-Fingerprint:  sha256:9f2c…e1
-```
-
-On the **master**, using the agent's address and those two values:
-
-```bash
-sudo trcrd enroll-agent 203.0.113.7 --code K7QM-3XWD --fingerprint sha256:9f2c…e1
-```
-
-The master first confirms that the host answering at that address holds the key
-behind the fingerprint. A wrong host gets nothing, not even the code. The
-command waits until the agent has reported in (60 seconds by default; change it
-with `--timeout`) and prints `enrolled <name>`.
-
-As soon as enrolment succeeds, the agent deletes the pairing code and closes
-port 8445 for good.
-
-Useful options and facts:
-
-- `--accept-from IP[,IP]` on the install accepts enrolment only from those
-  master addresses. For automated rollouts it can also replace the code. Only
-  rely on that inside a network where those addresses cannot be used by anyone
-  else, and keep `--fingerprint` in every case.
-- `--bootstrap-port N` changes the port. Then use `enroll-agent IP:N` on the
-  master.
-- `--open-firewall` opens the port in firewalld or ufw. Without it the
-  installer prints the command. The firewall rule does not close by itself, so
-  the installer also prints the command to remove it afterwards.
-- Lost the code? On the agent, `sudo trcrd join --pending --show-code` prints
-  the code and fingerprint again. Re-running the installer on a waiting agent
-  prints the same ones.
-- Repeated wrong codes are blocked for a short time.
-
-## Token one-liner (the agent reaches the master)
-
-On the **master**:
+To get the command, run this on the **master**:
 
 ```bash
 sudo trcrd enroll-agent
 ```
 
-It prints one command with a token included. Run that command on the **agent**
-host:
+It prints one command with a token in it, like this:
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh -s -- \
-  --join trcr-master.example.com:8444 \
+  --join 192.0.2.10:8444 \
   --token TRCR-ENROLL-1.… \
   --ca-hash sha256:…
 ```
 
-On a host that had nothing installed, this installs `trcrd`, enrols, writes
-`/etc/trcr/agent.yaml`, creates the service account, installs the service and
-starts it.
+Run that whole command on the **agent** host. It installs `trcrd`, creates the
+`trcr` user, enrolls with the master, writes `/etc/trcr/agent.yaml`, and
+installs and starts the agent's service. You'll see:
 
-- **The agent's name defaults to its hostname**, in lower case. Pass
-  `--node-id` to `enroll-agent` to choose a name.
-- **Tokens work once and expire** after one hour by default. Change that with
-  `--expires`.
-- **`--ca-hash` is what makes enrolment safe.** It tells the agent which master
-  to trust. `enroll-agent` always includes it; do not remove it.
-- If `trcrd` is already on the host, `enroll-agent` also prints the plain
-  `trcrd join …` form.
-- Pasting the same line twice is harmless. On an agent that is already enrolled
-  it only makes sure the service is installed and running.
+```
+==> Enrolling with the master at 192.0.2.10:8444 ...
+...
+enrolled as web-02
+...
+==> This host is enrolled and the agent is running. Nothing else to do here.
+```
 
-## Checking
+To check it worked, run `sudo trcrd agents` on the master. The new agent
+should show `up` within a minute.
 
-On the master:
+Things worth knowing about the join command:
+
+- The address after `--join` is the master's `advertise_addr`. If the agent
+  reaches the master by another name or address, replace it with that one,
+  keeping port 8444. Or have the master print it for you:
+  `sudo trcrd enroll-agent --advertise-addr trcr-master.example.com:8444`.
+- The token works once and expires after an hour. To change how long it lasts,
+  run `enroll-agent` with `--expires`. For a fresh token, run
+  `sudo trcrd enroll-agent` again.
+- `--ca-hash` tells the agent which master to trust, so a different host
+  pretending to be your master can't enroll it. `enroll-agent` always includes
+  it. Keep it in the command.
+- The agent's name defaults to its hostname, in lower case. To choose another
+  name, run `enroll-agent` with `--node-id <name>`.
+- If `trcrd` is already installed on the agent host, `enroll-agent` also prints
+  the shorter `sudo trcrd join …` form.
+- Pasting the same command twice is harmless. On a host that's already
+  enrolled, the installer says `This host is already enrolled as <name>.` and
+  only makes sure the service is installed and running.
+
+If enrollment fails, the installer says so and tells you what to try:
+
+```
+error: This host could not enroll with the master.
+       Each token works once and expires after an hour, so start with a new one: run
+       'sudo trcrd enroll-agent' on the master and paste the line it prints here.
+       If a new token fails too, check that this host can reach the master on
+       port 8444:  nc -vz 192.0.2.10 8444
+```
+
+Do what it says. A failed attempt leaves nothing behind that gets in the way of
+the next one, so you can paste a new command straight away. If `nc` can't
+connect, the master's port 8444 is closed or the address is one the agent can't
+reach. If you've hit the license's agent limit, the master's log says so (see
+above).
+
+## Pair an agent the master can reach
+
+Use this when the master can open a connection to the agent but the agent
+can't reach the master. On the **agent** host, run:
+
+```bash
+curl -fsSL https://trcr.dev/install/install.sh | sh -s -- --agent
+```
+
+This installs `trcrd`, creates the `trcr` user, and starts the agent in a
+waiting state on port 8445. It ends by printing a pairing code, a fingerprint
+and the exact command to run on the master:
+
+```
+==> This agent is installed and waiting for your master.
+
+    Pairing code:  K7QM-3XWD
+    Fingerprint:   sha256:9f2c…e1
+
+    To connect it, run this on the master:
+      sudo trcrd enroll-agent 203.0.113.7 --code K7QM-3XWD --fingerprint sha256:9f2c…e1
+
+    The code works once. As soon as the agent is enrolled, it stops listening
+    on port 8445 for good.
+```
+
+Copy that command and run it on the **master**. The master first checks that
+the host answering at that address holds the key that matches the
+fingerprint, so a different host gets nothing, not even the code. Then it waits
+for the agent to report in (60 seconds by default; change it with `--timeout`)
+and prints:
+
+```
+enrolled web-03 (203.0.113.7)
+```
+
+If the agent's address in the printed command isn't the one the master uses to
+reach it, replace it.
+
+### If the defaults don't fit
+
+- `--accept-from IP[,IP]` on the agent's install command makes it accept the
+  master only from those addresses.
+- `--bootstrap-port N` changes the waiting port from 8445. The printed command
+  then includes the port, as in `enroll-agent 203.0.113.7:N`.
+- `--node-id NAME` gives the agent a name other than its hostname.
+- `--open-firewall` opens the waiting port in firewalld or ufw. Without it, the
+  installer prints the command. After enrollment nothing listens on that port,
+  but the firewall rule stays, so the installer also prints the command to
+  remove it.
+- If you've lost the code, run `sudo trcrd join --pending --show-code` on the
+  agent. Running the install command again on a waiting agent prints the same
+  code and fingerprint.
+- If a wrong code is entered several times, the agent stops accepting attempts
+  for a short while. Wait a minute, then try again.
+
+## Check the agent is reporting
+
+On the master, run:
 
 ```bash
 sudo trcrd agents
 ```
 
-A new agent should show `up` within a minute. The states are:
+You'll see something like this:
 
-| State | Meaning |
+```
+NODE_ID       STATUS  LAST SEEN  PROBES  CERT EXPIRES
+web-01-local  up      14s ago    8       in 364d
+web-02        up      9s ago     8       in 364d
+
+2 agent(s); down-after 1m30s
+```
+
+A new agent should show `up` within a minute. `PROBES` is how many probes the
+master serves to that agent, including the automatic agent-to-agent pings.
+`CERT EXPIRES` is when its certificate runs out; agents renew it by themselves
+long before then. The last line says how long an agent can be silent before it
+counts as down.
+
+| Status | What it means |
 |---|---|
 | `up` | Reporting normally. |
 | `down` | Was reporting, and has been silent for longer than the limit (90 seconds by default). |
 | `never-seen` | Enrolled, but has never made a successful call. See [Troubleshooting](troubleshooting.md#an-agent-is-stuck-at-never-seen). |
-| `revoked` | Trust withdrawn. Listed with `--all`. |
+| `revoked` | You've withdrawn trust in it. Shown only with `--all`. |
 
 `trcrd agents` reads saved state, so it works even when the master is stopped.
-`--json` gives output for scripts. `--stale` lists only agents that are not
-reporting and exits with status 1 if there are any:
+`--json` gives output for scripts. `--stale` lists only the agents that aren't
+reporting and exits with status 1 if there are any, which makes it easy to
+check from cron:
 
 ```bash
 trcrd agents --stale || echo "an agent is not reporting"
@@ -119,11 +188,14 @@ trcrd agents --stale || echo "an agent is not reporting"
 
 ## Agent-to-agent probes
 
-As soon as two agents are enrolled, the master creates a ping between every
-pair, in both directions, named `mesh-<a>-to-<b>`. These feed the Agent Mesh
-and Agent-to-Agent dashboards. They appear in `trcrd probes` marked
-`auto-mesh`, which shows where they came from and is not a licence bundle. They
-are not written to your configuration files.
+As soon as two agents are enrolled, the master adds a ping between every pair,
+in both directions, named `mesh-<a>-to-<b>`. These feed the Agent Mesh and
+Agent-to-Agent dashboards. They show up in `trcrd probes` marked `auto-mesh`.
+They're not written to your configuration files, and they don't count as a
+license bundle.
+
+To turn them off or change how often they run, set this in `master.yaml` and
+restart the master:
 
 ```yaml
 master:
@@ -132,59 +204,57 @@ master:
     auto_mesh_interval: 60s
 ```
 
-## Choosing where a probe runs
+## Choose where a probe runs
 
-Each probe can say which agents run it. See
+By default, every agent runs every probe. To pick agents for a probe, see
 [Probes](probes.md#where-a-probe-runs).
 
-## Moving an agent to another master
+## Move an agent to another master
 
-On the agent:
+First, run this on the **agent**:
 
 ```bash
 sudo trcrd leave
 ```
 
-Then enrol it with the new master in either of the two ways above.
+Then enroll it with the new master in either of the two ways above.
 
 `trcrd leave` tells the old master first, while the agent's certificate still
-works, then stops the service and deletes the agent's certificate and
-`agent.yaml`. If the master cannot be reached, **nothing is deleted**. For a
-master that is gone for good, use `--local-only`. `--keep-config` keeps
-`agent.yaml`.
+works. Then it stops the service and deletes the agent's certificate and
+`agent.yaml`. If the master can't be reached, nothing is deleted. For a master
+that's gone for good, add `--local-only`. To keep `agent.yaml`, add
+`--keep-config`.
 
-`trcrd join` refuses to run on a host that is already enrolled:
+If you rebuilt the master and paste its new join command on an old agent, the
+agent sees the different `--ca-hash`, says
+`the master was rebuilt; enrolling again`, and enrolls with the new master.
 
-```
-trcrd join: config /etc/trcr/agent.yaml already exists; pass --force to overwrite
-agent already enrolled at /var/lib/trcr/agent; pass --force to re-enroll (destructive)
-```
-
-This is a local check, not a network problem. Prefer `trcrd leave`. Use
-`--force` only for an enrolment that is stale or never completed. To see which
-master a host belongs to:
+To see which master a host belongs to, run this on the agent:
 
 ```bash
 grep master_addr /etc/trcr/agent.yaml
 ```
 
-If you rebuilt the master and paste a new one-liner on an old agent, the agent
-notices the different `--ca-hash` and enrols again.
+## Retire an agent
 
-## Retiring an agent
+These commands stop trusting an agent and clean up after it:
 
 ```bash
 sudo trcrd agents revoke <name>    # on the master: stop trusting it, keep the record
 sudo trcrd agents remove <name>    # on the master: delete the record
-sudo trcrd leave                   # on the agent: undo the enrolment
+sudo trcrd leave                   # on the agent: undo the enrollment
 ```
 
-Revoking takes effect on a running master within seconds, with no restart.
-A revoked agent is refused on its next call, even though its certificate has
-not expired.
+Both `revoke` and `remove` ask you to confirm; add `--yes` to skip the
+question. Revoking takes effect on a running master within seconds, with no
+restart. The agent is refused on its next call, even though its certificate
+hasn't expired.
 
-- **`revoke`** keeps the record, so you can see later that the agent was
-  retired. The name can be used again: enrolling under it issues a new
-  certificate. The old certificate does not start working again.
-- **`remove`** deletes the record and frees the name.
-- Neither command touches the agent host.
+- `revoke` keeps the record, so you can see later that the agent was retired.
+  You can enroll a new agent under the same name; it gets a new certificate,
+  and the old one stays refused.
+- `remove` deletes the record and frees the name.
+- Neither command touches the agent host. Run `sudo trcrd leave` there, or
+  uninstall TRCR from it (see [Operations](operations.md#uninstall-trcr)).
+
+Revoked and removed agents no longer count toward your license's agent limit.
