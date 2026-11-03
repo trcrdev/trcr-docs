@@ -318,6 +318,22 @@ trcr-master`; where it says `journalctl -u trcrd-agent`, use
 deletes the volumes, including the master's CA and the results. `etc/` on
 the host stays; keep `etc/license.lic` if you plan to start again.
 
+With quadlets, stop every `trcr-` unit, including the volume and network
+units Quadlet generated so that a later install creates the volumes again,
+then remove the unit files and the volumes:
+
+```bash
+sudo systemctl stop 'trcr-*'
+cd /etc/containers/systemd && sudo rm -f trcr.network trcr-*.container trcr-*.volume
+sudo systemctl daemon-reload
+sudo podman volume rm trcr-master-state trcr-agent-etc trcr-agent-state trcr-results-pg-data \
+  trcr-secrets trcr-bootstrap trcr-grafana-data trcr-grafana-provisioning trcr-grafana-dashboards
+sudo podman network rm trcr
+```
+
+On a remote agent, remove just the two `trcr-agent-*` volumes; there is no
+network. `/etc/trcr` and `/etc/trcr-container` stay, with your license.
+
 ## macOS and Docker Desktop
 
 The stack runs on Docker Desktop, with two differences. Host networking
