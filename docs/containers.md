@@ -148,6 +148,12 @@ trcr-master trcrd agents`): podman-compose names the containers
 not find them. The `:z` labels on the bind mounts are already in the file
 for SELinux hosts.
 
+Three commands differ. `ps` takes no `-a` and lists the finished jobs
+anyway. `restart` prints "container state improper", exits 0 and restarts
+nothing, so use `stop` and then `start` (`sudo podman-compose stop
+trcr-master && sudo podman-compose start trcr-master`). There is no `rm`;
+"An agent that never came up" below shows what to run instead.
+
 ### With quadlets
 
 Quadlet turns `.container`, `.network` and `.volume` files under
@@ -273,6 +279,17 @@ network the rest of the stack uses). `agents remove` only matters when the
 agent is already listed; a listed agent whose volumes are gone can't enroll
 again under the same name otherwise. For a remote agent, run
 `enroll-agent --env` again and replace the two lines in its `.env`.
+
+podman-compose has no `rm`, so remove the two containers with Podman
+itself, the agent first because it depends on the enrollment job:
+
+```bash
+sudo podman-compose exec trcr-master trcrd agents remove --yes trcr-agent-1
+sudo podman-compose stop trcr-agent-1 trcr-enroll
+sudo podman rm trcr_trcr-agent-1_1 && sudo podman rm trcr_trcr-enroll_1
+sudo podman volume rm trcr_trcr_agent_1_etc trcr_trcr_agent_1_state trcr_trcr_bootstrap
+sudo podman-compose up -d
+```
 
 **Upgrading.** Put `TRCR_IMAGE=ghcr.io/trcrdev/trcrd:<release>` in `.env`
 and run `docker compose up -d`; with quadlets, change the `Image=` line in
