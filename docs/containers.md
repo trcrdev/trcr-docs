@@ -65,7 +65,7 @@ docker compose exec trcr-master trcrd agents
 
 ```
 NODE_ID       STATUS  LAST SEEN  PROBES  CERT EXPIRES
-trcr-agent-1  up      24s ago    7       in 364d
+trcr-agent-1  up      11s ago    7       in 364d
 
 1 agent(s); down-after 1m30s
 ```

@@ -198,7 +198,9 @@ web-02        up      9s ago     8       in 364d
 2 agent(s); down-after 1m30s
 ```
 
-A new agent should show `up` within a minute. `PROBES` is how many probes the
+A new agent should show `up` within a minute. `LAST SEEN` is the agent's most
+recent call to the master; for a healthy agent it stays within about 15
+seconds, like the samples above. `PROBES` is how many probes the
 master serves to that agent, including the automatic agent-to-agent pings.
 `CERT EXPIRES` is when its certificate runs out; agents renew it by themselves
 long before then. The last line says how long an agent can be silent before it
