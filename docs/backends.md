@@ -39,32 +39,23 @@ each store failed.
 Keep passwords and tokens out of `master.yaml`. Each store reads its secret
 from an environment variable that you name with a `*_env` setting, such as
 `password_env: TRCR_PG_PASSWORD`. Put the variable in `/etc/trcr/master.env`,
-one `NAME=value` per line. The master's service reads that file when it
-starts.
+one `NAME=value` per line. The installer creates that file on every master,
+empty and readable by root and the `trcr` group only, and the master's
+service reads it when it starts.
 
-To add or change a secret, run this on the **master**. The second line makes
-the file readable by root and the `trcr` group only:
+To add or change a secret, run this on the **master**:
 
 ```bash
 sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
-sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
 sudo trcrd validate
 sudo systemctl restart trcrd-master
 ```
 
 `validate` checks that every variable your stores name is set by a file the
 master's service reads. If one isn't, it says which variable and which file to
-put it in.
-
-A master installed by an older installer may not read `master.env` yet. To
-check, run `sudo systemctl show trcrd-master -p EnvironmentFiles`. If
-`/etc/trcr/master.env` isn't listed, run `sudo systemctl edit trcrd-master`
-and add:
-
-```ini
-[Service]
-EnvironmentFile=-/etc/trcr/master.env
-```
+put it in. If the master's service file came from an older release and doesn't
+read `master.env`, running the installer again adds a drop-in that does; see
+[Operations](operations.md#upgrade-trcr).
 
 The all-in-one install and `--postgres-dsn` keep the database password in
 `/etc/trcr/postgres.env` and connect that file to the service for you.
@@ -90,9 +81,20 @@ backends:
   `auto_create_tables: true`, TRCR creates and maintains everything it needs
   inside that database, including new partitions. There's no migration step
   when you upgrade.
+- `sslmode=require` is for a database that has TLS. A database without TLS,
+  which includes many LAN installs and the stock PostgreSQL container image,
+  needs `sslmode=disable`. With the wrong setting the store never opens: the
+  master logs a TLS or connection error and discards every result.
 - Data is partitioned by month and kept for 12 months unless you change
   `retention_months`. Old partitions are dropped automatically.
 - For Grafana, create a separate read-only user. It only needs `SELECT`.
+
+On a master set up with `--postgres-dsn` or `--all-in-one`, this entry carries
+the comment `# written by the TRCR installer (--postgres-dsn)` (or
+`(--all-in-one)`) above it. Running the installer again with a different
+`--postgres-dsn` updates the `dsn:` line of that entry and restarts a running
+master. An entry you wrote yourself is never changed. See
+[Install TRCR](install.md#a-master-with-a-database-you-already-run).
 
 ### TimescaleDB
 
