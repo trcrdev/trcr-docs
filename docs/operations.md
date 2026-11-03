@@ -307,16 +307,72 @@ curl -fsSL https://trcr.dev/install/uninstall.sh | sh -s -- --dry-run  # show wh
 curl -fsSL https://trcr.dev/install/uninstall.sh | sh -s -- --purge    # delete everything
 ```
 
-On an agent, it runs `trcrd leave` first, while the agent's certificate still
-works. Then it stops and removes the service and the binary, including the
-`/usr/bin/trcrd` link if the installer made one.
+It lists what it found on the host and asks before it changes anything. With
+no terminal to ask on, such as in a script or an `ssh` command, it stops and
+prints the command to run instead, with `--yes` added:
 
-By default, `/etc/trcr`, `/var/lib/trcr` and the `trcr` user stay. Running the
-installer again brings the deployment back with the same identity and license.
+```
+error: no terminal for confirmation; re-run with --yes:
+         curl -fsSL https://trcr.dev/install/uninstall.sh | sh -s -- --yes
+```
 
-On an all-in-one host, the uninstaller removes the TRCR dashboards and
-datasource from Grafana. It leaves the PostgreSQL and Grafana packages, and
-your results database, in place.
+It stops and removes the TRCR services and the binary, including the
+`/usr/bin/trcrd` link if the installer made one. By default, `/etc/trcr`,
+`/var/lib/trcr` and the `trcr` user stay.
+
+On a **master**, running the installer again with the options you installed
+with brings the deployment back with the same identity and license. An
+all-in-one host comes back the same way, local agent included.
+
+On an **agent**, the uninstaller first tells the master the agent is leaving,
+while the agent's certificate still works. It does this with or without
+`--purge`:
+
+```
+==> Telling the master this agent is leaving ...
+    master 192.0.2.10:8443 retired this agent (revoked)
+```
+
+That retires the agent's credentials. Without `--purge`,
+`/etc/trcr/agent.yaml` is kept, but running the installer again on the host
+says
+`This host was an agent (web-02) and has left its master, so it needs a new enrollment.`
+To make it an agent again, run `sudo trcrd enroll-agent` on the master and
+paste the command it prints on the host.
+
+To keep the agent's identity instead, add `--skip-leave`. The master then
+keeps the agent's record and shows it as down. Run the plain install command
+on the host again, and the agent comes back as it was:
+
+```
+==> This host is an agent (enrolled as web-02), but its service was removed. Putting it back ...
+...
+==> The agent is running again. Nothing else to do here.
+```
+
+If the master can't be reached during the leave step, nothing is retired and
+the uninstall still finishes. It tells you to run
+`sudo trcrd agents remove web-02 --yes` on the master. If `trcrd` was already
+removed from the host, it can't tell the master at all, and says so:
+
+```
+warning: trcrd is not installed, so this host cannot tell the master it is leaving. On the master run: sudo trcrd agents remove web-02 --yes
+```
+
+On an all-in-one host, the uninstaller removes the TRCR dashboards and data
+source from Grafana. It leaves the PostgreSQL and Grafana packages, and your
+results database, in place. Grafana keeps listening on 127.0.0.1 only, with
+sign-up and anonymous access off, unless you installed with `--open-grafana`.
+At the end, the uninstaller prints the two `psql` commands that delete the
+results database and its user, in case you want them gone too. On a host
+without `sudo`, they start with `runuser -u postgres --` instead of
+`sudo -u postgres`.
+
+`--purge` also deletes `/etc/trcr`, `/var/lib/trcr`, the TRCR logs
+(`/var/log/trcr` and `/var/log/trcr-install.log`) and the `trcr` user. On an
+all-in-one host, nothing keeps a copy of Grafana's admin password after that,
+so the closing note shows the command that sets a new one. Grafana's other
+TRCR settings stay, so it still listens only where it did before.
 
 > **Warning:** Before you purge a master, copy `/etc/trcr/license.lic`
 > somewhere safe. `--purge` deletes `/var/lib/trcr`, which holds your
@@ -324,11 +380,8 @@ your results database, in place.
 > certificate stops working, and you'll have to enroll each agent again
 > against a rebuilt master.
 
-Other options: `--yes` skips the questions, and you need it when there's no
-terminal to answer them on. `--skip-leave` doesn't contact the master, and
-`--keep-binary` leaves `trcrd` installed. If the master can't be
-reached during the leave step, the uninstall still finishes and tells you to
-run `sudo trcrd agents remove <name>` on the master.
+Other options: `--yes` skips the question, `--skip-leave` doesn't contact the
+master, and `--keep-binary` leaves `trcrd` installed.
 
 ## Stop the master
 
