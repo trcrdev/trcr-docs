@@ -260,7 +260,7 @@ sudo systemctl restart trcrd-master
 ```
 
 Any editor run with `sudo` works in place of `nano`; minimal images may have
-only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+only `vi`, or no editor at all: `sudo apt-get update && sudo apt-get install nano` (Debian) or
 `sudo dnf install nano` (Fedora, CentOS).
 
 If `validate` says the unit has no `EnvironmentFile=` at all, your master's

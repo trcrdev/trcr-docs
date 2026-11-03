@@ -81,7 +81,7 @@ sudo trcrd validate
 ```
 
 Any editor run with `sudo` works in place of `nano`; minimal images may have
-only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+only `vi`, or no editor at all: `sudo apt-get update && sudo apt-get install nano` (Debian) or
 `sudo dnf install nano` (Fedora, CentOS). `validate` warns about any variable
 the master needs that no file of its service sets.
 If your master's service doesn't read `master.env` yet, see

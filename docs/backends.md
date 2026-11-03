@@ -52,7 +52,7 @@ sudo systemctl restart trcrd-master
 ```
 
 Any editor works, as long as you run it with `sudo`; minimal images may have
-only `vi`, or no editor at all: `sudo apt-get install nano` (Debian) or
+only `vi`, or no editor at all: `sudo apt-get update && sudo apt-get install nano` (Debian) or
 `sudo dnf install nano` (Fedora, CentOS). Editing the file in place keeps its
 owner and permissions.
 
