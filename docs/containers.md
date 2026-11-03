@@ -66,6 +66,8 @@ docker compose exec trcr-master trcrd agents
 ```
 NODE_ID       STATUS  LAST SEEN  PROBES  CERT EXPIRES
 trcr-agent-1  up      24s ago    7       in 364d
+
+1 agent(s); down-after 1m30s
 ```
 
 When you see `up` next to `trcr-agent-1`, you're done. The seven starter
@@ -88,16 +90,14 @@ below) or give the host more memory.
 
 `trcr-init` generated the Postgres and Grafana passwords into a volume only
 these containers mount, wrote `etc/master.yaml` and the starter probes in
-`etc/conf.d/starter.yaml`, installed your license, and copied the datasource
-and dashboards into Grafana's volumes. `trcr-enroll` created a one-hour,
-single-use token for the local agent and handed it over through a volume,
-so the token is never in `.env`. The agent enrolled with it on its first
-start and keeps its identity in its own volumes, so restarts and
-`docker compose up -d --force-recreate` don't enroll again.
-
-Everything under `etc/` belongs to uid 65532, the user the daemon runs as,
-and is yours to edit. Reference copies of every configuration file are in
-`etc/examples/`.
+`etc/conf.d/starter.yaml`, installed your license, and set up Grafana's
+datasource and dashboards. `trcr-enroll` created a one-hour, single-use
+token for the local agent and handed it over through a volume, never
+`.env`; the agent enrolled with it on its first start and keeps its
+identity in its own volumes, so restarts and `--force-recreate` don't
+enroll again. Everything under `etc/` belongs to uid 65532, the user the
+daemon runs as, and is yours to edit; reference copies of every
+configuration file are in `etc/examples/`.
 
 ## Add an agent on another host
 
@@ -126,10 +126,8 @@ The agent enrolls on its first start and shows up in `trcrd agents` on the
 master within 30 seconds. The token is single-use and expires after an hour
 (change that with `--expires` on `enroll-agent`); once the agent is listed,
 delete the two lines from `.env`. Ports 8443 and 8444 on the master must be
-reachable from the agent.
-
-An agent host that should run the daemon directly instead of a container
-uses the join command that `trcrd enroll-agent` prints without `--env`; see
+reachable from the agent. An agent host that should run the daemon directly
+uses the join command `trcrd enroll-agent` prints without `--env`; see
 [Adding agents](agents.md).
 
 ## Podman
@@ -186,10 +184,9 @@ sudo systemctl start trcr-master trcr-agent trcr-grafana
 
 `systemctl start` returns after about 25 seconds, once the master is
 healthy and the agent is running; the setup and enrollment units run first
-on their own because every unit requires them. There is nothing to
-`enable`: the units start at boot through their `[Install]` sections, and
-the one-shot units run again at every boot and find nothing left to do.
-Check the same way as with Compose:
+on their own. There is nothing to `enable`: the units start at boot through
+their `[Install]` sections, and the one-shot units run again at every boot
+and find nothing left to do. Check the same way as with Compose:
 
 ```bash
 sudo podman exec trcr-master trcrd agents
@@ -219,10 +216,10 @@ Ping, batch ping and traceroute open raw sockets, which needs the `NET_RAW`
 capability. Docker only grants capabilities to root, so the `trcrd`
 containers start as root with everything but `NET_RAW`, `SETUID` and
 `SETGID` dropped, and the entrypoint immediately switches to uid 65532,
-keeping `NET_RAW` and nothing else. The daemon itself never runs as root,
-and `no-new-privileges` is on. Podman hands the capability to the image's
-user directly, so the quadlets run as uid 65532 from the start. An agent
-that only runs TCP, HTTP, DNS or SSL probes can drop `NET_RAW` too.
+keeping `NET_RAW` and nothing else; `no-new-privileges` is on. Podman hands
+the capability to the image's user directly, so the quadlets run as uid
+65532 from the start. An agent that only runs TCP, HTTP, DNS or SSL probes
+can drop `NET_RAW` too.
 
 The agent uses host networking so its measurements come from the host's
 own interfaces and traceroute sees real hops rather than the container
@@ -245,8 +242,10 @@ docker compose restart trcr-master
 docker compose exec trcr-master trcrd probes
 ```
 
-With quadlets: `sudo systemctl restart trcr-master`. The daemon runs as uid
-65532 and must be able to read the file, so install it rather than copy it:
+With quadlets: `sudo systemctl restart trcr-master`, which also re-runs
+`trcr-enroll` (it finds the agent enrolled and does nothing); the agent
+keeps running and reconnects. The daemon runs as uid 65532 and must be
+able to read the file, so install it rather than copy it:
 
 ```bash
 sudo install -o 65532 -g 65532 -m 0640 FILE etc/conf.d/NAME.yaml
@@ -305,11 +304,10 @@ the host stays; keep `etc/license.lic` if you plan to start again.
 
 The stack runs on Docker Desktop, with two differences. Host networking
 puts the agent in Docker Desktop's Linux VM, not on your Mac, so its
-latency and traceroute are measured from that VM (it has its own address,
-usually `192.168.65.x`); fine for trying TRCR, not for measuring the Mac's
-own connection. And the bind-mounted `etc/` shows up owned by your macOS
-user, not uid 65532; that is Docker Desktop's file sharing, and nothing
-needs changing. There is no `sudo chown` step on macOS.
+latency and traceroute are measured from that VM (usually `192.168.65.x`);
+fine for trying TRCR, not for measuring the Mac's own connection. And the
+bind-mounted `etc/` shows up owned by your macOS user, not uid 65532; that
+is Docker Desktop's file sharing, and nothing needs changing.
 
 > **Note:** On a laptop that sleeps, agents elsewhere will report the master
 > as down while the lid is closed. Run a production master on a server.
