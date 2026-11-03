@@ -239,10 +239,16 @@ docker compose restart trcr-master
 docker compose exec trcr-master trcrd probes
 ```
 
-With quadlets: `sudo systemctl restart trcr-master`. A file copied in as
-root is fine; the setup job hands everything under `etc/` to uid 65532 on
-the next `up`, and `trcrd validate` inside the container tells you about a
-file it can't read.
+With quadlets: `sudo systemctl restart trcr-master`. The daemon runs as uid
+65532 and must be able to read the file, so install it rather than copy it:
+
+```bash
+sudo install -o 65532 -g 65532 -m 0640 FILE etc/conf.d/NAME.yaml
+```
+
+A file it can't read is skipped with an error in the master's log, and
+`trcrd validate` reports it; `restart` doesn't re-run the setup job that
+fixes ownership on `up`.
 
 **An agent that never came up.** If an agent's first enrollment failed (the
 token expired, a typo in `TRCR_JOIN`), the agent container restarts and

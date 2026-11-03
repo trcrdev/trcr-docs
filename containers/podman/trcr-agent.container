@@ -7,9 +7,13 @@
 #
 # Rootful Podman is the supported mode: rootless Podman cannot return the
 # TTL-exceeded replies traceroute needs.
+#
+# Wants=, not Requires=: a failed enrollment job (the master was down for
+# a moment) must not leave the agent inactive once the master is back;
+# the agent waits for the token file itself and keeps restarting.
 [Unit]
 Description=TRCR agent (this host)
-Requires=trcr-enroll.service
+Wants=trcr-enroll.service
 After=trcr-enroll.service
 
 [Container]
