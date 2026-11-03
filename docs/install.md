@@ -39,6 +39,9 @@ curl -fsSL https://trcr.dev/install/install.sh | sh -s -- --all-in-one \
 Already have a license file? Use `--license /path/to/license.lic` instead of
 `--email` and `--company`, and everything starts in the same run.
 
+If you're not root, `sudo` may ask for your password first, before the
+installer prints anything.
+
 Options go after `sh -s --`. Without it, `sh` keeps the options for itself and
 the installer never sees them.
 
@@ -125,12 +128,11 @@ You'll see something like this once you've clicked:
 enrolled as web-01-local
 ...
 ==> Waiting for the first results (up to 90 seconds) ...
-    Data is flowing: ping http dns tcp
+    Data is flowing: ping http dns tcp ssl_expiry traceroute alive
 
 You are all set. The master and a local agent are running and recording.
 
-    Dashboards with data now      Ping, HTTP, DNS, Overview, Per-Agent Operations, SLO Landing
-    Within the hour               SSL Expiry, Cert Fleet, Traceroute, Map, Alive (as those probes first run)
+    Dashboards with data now      Ping, HTTP, DNS, SSL Expiry, Cert Fleet, Traceroute, Map, Alive, Overview, Per-Agent Operations, SLO Landing
     Once a second agent joins     Agent-to-Agent, Agent Mesh, Cross-Vantage RTT Divergence
     Need their own probes         Throughput, BGP, DNS Propagation (see /etc/trcr/examples/)
 ```
@@ -139,9 +141,14 @@ When you see `You are all set`, you're done. It appears only when the master
 opened your results store, probes are configured and the local agent is
 running.
 
-The list is built from the results that have arrived, so it tells you which
-dashboards have data now and which fill later. An empty Traceroute or Agent
-Mesh panel in the first few minutes is normal.
+The wait ends about ten seconds after the first result arrives, so your list
+may be shorter than this. It's built from the results that have arrived: a
+probe type that hasn't reported yet is listed under `Within the hour` instead,
+with `(as those probes first run)`. Once a second agent is enrolled, the
+agent-to-agent dashboards appear under `Dashboards with data now`, or under
+`Within minutes` with `(as the agent-to-agent probes first run)` until their
+first results arrive. An empty Traceroute or Agent Mesh panel in the first few
+minutes is normal.
 
 If something is missing, you'll see one of these instead:
 
@@ -156,6 +163,13 @@ If something is missing, you'll see one of these instead:
   being thrown away.` The `Its log says:` line quotes the error from your
   results store, for example a wrong database password, and the lines after it
   say where to fix it.
+- `The master and a local agent are running, but the master has not said which
+  results store it opened, so whether results are being saved is not known
+  yet.` This appears only on a host without `psql`, where the setup relies on
+  the master's log instead of looking for rows. It waits up to 10 seconds for
+  the master to report its stores; if it hasn't by then, look in a minute with
+  `sudo journalctl -u trcrd-master -n 30`. `backend ready` means results are
+  being saved; `DISCARDED` means they aren't.
 
 Fix what it names, then run `sudo /etc/trcr/finish-setup.sh` again. For more
 on each one, see [Troubleshooting](troubleshooting.md#the-install-ends-without-you-are-all-set).
@@ -164,7 +178,9 @@ The local agent is named after the host, with `-local` on the end.
 
 `trcr-firstboot` exists only when you installed with `--email`. With
 `--license`, the same output appears in your terminal at the end of the
-install instead.
+install instead. If it ends with one of the messages above, the installer
+ends with `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
+and exits with status 1.
 
 To finish by hand at any time, run this on the host. It's safe to run as often
 as you like:
@@ -218,7 +234,11 @@ sudo trcrd enroll-agent
 
 It prints one command with a single-use token in it. Run that command on the
 **agent** host. If you installed with `--license`, the install summary already
-printed one, and it works for an hour.
+printed one, and it works for an hour. Only the run that enrolls the local
+agent prints a ready-made command; running the installer or `finish-setup.sh`
+again says `To add another host, run this here on the master and paste the
+command it prints on that host:` and points at `sudo trcrd enroll-agent`
+instead.
 
 On the agent, you'll see:
 
@@ -275,20 +295,56 @@ it, so the password stays out of your shell history, the install log and
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh -s -- \
-  --postgres-dsn "postgres://trcr@db.example.com:5432/trcr_results?sslmode=require" \
+  --postgres-dsn 'postgres://trcr@db.example.com:5432/trcr_results?sslmode=require' \
   --postgres-password-file pg-password.txt
 ```
+
+The quotes keep the `?` from the shell. `sslmode=require` is right for a
+database that has TLS. A database without TLS, which includes many LAN
+installs and the stock PostgreSQL container image, needs `sslmode=disable`;
+otherwise the master's connection is refused at the handshake and nothing is
+saved.
 
 The installer copies the password into `/etc/trcr/postgres.env`, which only
 root and the `trcr` group can read, and hands it to the master through
 systemd. It never goes into `master.yaml`, and you can delete your file
 afterwards. If `psql` is installed on the host, the installer checks it can
 connect, and stops if it can't. Without `psql`, the connection is tried when
-the master starts.
+the master starts. Once the configuration is written, the installer says:
+
+```
+==> Pointed the master at your PostgreSQL database (the password stays in /etc/trcr/postgres.env, not in master.yaml).
+```
 
 If the password is already in an exported environment variable, use
 `--postgres-password-env <NAME>` instead of `--postgres-password-file`. Either
 way, the password can't contain a quote mark or a backslash.
+
+The `backends:` entry the installer writes carries the comment
+`# written by the TRCR installer (--postgres-dsn)` above it. If the address
+or `sslmode` turns out to be wrong, run the installer again with the corrected
+`--postgres-dsn`. It updates the `dsn:` line of that entry and says
+`Updated the database address in /etc/trcr/master.yaml.`; if the master is
+running, it follows with `Restarting trcrd-master so it uses the new address ...`.
+
+If `/etc/trcr/master.yaml` was already on the host and the installer didn't
+write it, it's left as it is, and the end of the run says so:
+
+```
+  note: Your existing /etc/trcr/master.yaml was kept as it was, because the installer did not
+  write it. Nothing in it names the database address you gave, so results are not
+  going there yet. To use it, add this under backends: (or change the dsn: of the
+  entry that is there):
+      - name: postgres-main
+        type: postgres
+        dsn: "postgres://trcr@db.example.com:5432/trcr_results?sslmode=require"
+        password_env: TRCR_PG_PASSWORD
+        auto_create_tables: true
+  Or regenerate it from scratch, which discards every other edit in it:
+```
+
+The last line is followed by a `sudo trcrd init --force` command. Use it only
+if nothing else in the file matters to you.
 
 So that your database gets data straight away, the installer also writes seven
 starter probes that measure this host's connection to the internet:
@@ -345,10 +401,24 @@ left. Here they are with the reason for each:
    adding more agents. Without `psql` on the host, a working connection shows
    as `The master opened your PostgreSQL database; results are going there.`
 
+   If the master can't reach the database, the step ends with `The master is
+   running, but it is not saving results anywhere, so they are being thrown
+   away.` and quotes the database's error. For a connection or TLS failure,
+   the next lines are:
+
+   ```
+       Fix the database, or the sslmode/host in the dsn: line of /etc/trcr/master.yaml (a database without TLS needs sslmode=disable), then:
+       (Or run the installer again with the corrected --postgres-dsn; it updates that line and restarts the master.)
+         sudo systemctl restart trcrd-master && sudo /etc/trcr/finish-setup.sh
+       The full log: sudo journalctl -u trcrd-master -n 30
+   ```
+
 You can also add `--license /path/to/license.lic` to the install command. The
 master then starts straight away with the starter probes, and the install ends
-the way the all-in-one install does. To add probes afterwards, copy them in,
-validate, and restart the master with `sudo systemctl restart trcrd-master`.
+the way the all-in-one install does. If the master can't open the database,
+the install ends with `Fix what it reported above, then run: sudo /etc/trcr/finish-setup.sh`
+and exits with status 1. To add probes afterwards, copy them in, validate, and
+restart the master with `sudo systemctl restart trcrd-master`.
 
 The summary at the end shows what the master uses:
 
@@ -389,10 +459,13 @@ plus choosing the store.
 
 For PostgreSQL, step 1 tells you to run the installer again with
 `--postgres-dsn` and `--postgres-password-file`, which writes the
-configuration for you. For any other store, you edit `backends:` in
-`master.yaml` yourself, and a password the store names with `password_env`
-goes in `/etc/trcr/master.env` as `NAME=value`. The master's service reads that
-file. See [Storing results](backends.md).
+configuration for you. The URL it shows is in single quotes, with the
+reminder that a database without TLS needs `sslmode=disable`. For any other
+store, you edit `backends:` in `master.yaml` yourself, and a password the
+store names with `password_env` goes in `/etc/trcr/master.env` as
+`NAME=value`. The master's service reads that file, and the installer has
+already created it, empty, with the right permissions. See
+[Storing results](backends.md).
 
 ### Installer options
 
@@ -451,7 +524,7 @@ These go between the pipe and `sh`:
 | Variable | What it does | Example |
 |---|---|---|
 | `TRCR_INSTALL_DIR` | Install `trcrd` somewhere other than `/usr/local/bin`. | `curl -fsSL https://trcr.dev/install/install.sh \| TRCR_INSTALL_DIR=/opt/trcr/bin sh` |
-| `TRCR_SKIP_SETUP=1` | Install or upgrade the binary only. Nothing in `/etc/trcr` is touched. | `curl -fsSL https://trcr.dev/install/install.sh \| TRCR_SKIP_SETUP=1 sh` |
+| `TRCR_SKIP_SETUP=1` | Install or upgrade the binary only. Nothing in `/etc/trcr` is touched, and the run ends after the `Installed` line; on an agent host it adds that the host is an agent. | `curl -fsSL https://trcr.dev/install/install.sh \| TRCR_SKIP_SETUP=1 sh` |
 | `TRCR_FORCE=1` | Download and reinstall the same version, even if it's already up to date. | `curl -fsSL https://trcr.dev/install/install.sh \| TRCR_FORCE=1 sh` |
 
 ### What the installer changes on your host
@@ -470,6 +543,9 @@ Every Linux install:
 - Installs the `trcrd-master` service and `/etc/trcr/finish-setup.sh`, the
   script that starts the master and enrolls a local agent once a license is in
   place.
+- Creates `/etc/trcr/master.env`, empty and readable by root and the `trcr`
+  group only, for passwords that results stores read from the environment.
+  The master's service reads it.
 - Writes a log of the run to `/var/log/trcr-install.log`.
 
 The all-in-one install also:
@@ -495,7 +571,9 @@ The installer changes the host firewall only when you give `--open-firewall`.
 
 You can run the installer as often as you like. Running it again upgrades
 `trcrd`, restarts the TRCR services that were running, and leaves your
-configuration, license and data alone. See
+configuration, license and data alone. A run with nothing to upgrade and
+everything running takes seconds and says
+`Nothing to do: trcrd v26.11.0 is installed and everything is running.` See
 [Operations](operations.md#upgrade-trcr).
 
 ### How the installer protects you
