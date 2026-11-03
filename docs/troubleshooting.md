@@ -12,9 +12,10 @@ sudo trcrd validate --config /etc/trcr/master.yaml
 
 If the problem happened during an install, read `/var/log/trcr-install.log`
 first. It holds the full output of every installer run, including the package
-manager's.
+manager's and `finish-setup.sh`'s.
 
-To tell a real problem from normal noise in the master's log, see
+A healthy master logs almost nothing but `INFO` lines. A `WARN` or `ERROR`
+line is worth reading, and most of them name the fix. See
 [What a healthy master log looks like](operations.md#what-a-healthy-master-log-looks-like).
 For more detail in the log, set `log.level: debug` in `master.yaml`, restart
 the master, and set it back afterwards.
@@ -65,6 +66,46 @@ there's no license yet. The installer's last lines list the steps that are
 left; [Install TRCR](install.md#a-master-with-a-database-you-already-run) has
 them too.
 
+### The install ends without `You are all set`
+
+`finish-setup.sh` says `You are all set` only when the master opened its
+results store, probes are configured and the local agent is running. Otherwise
+it ends with one of these. Fix what it names, then run
+`sudo /etc/trcr/finish-setup.sh` again; it's safe to repeat.
+
+`Nothing is measured yet: no probes are configured.` Everything runs, but there
+are no probes. To start from the samples, run the three commands it prints:
+
+```bash
+sudo install -o root -g trcr -m 0640 /etc/trcr/conf.d/_samples.yaml /etc/trcr/conf.d/probes.yaml
+sudo trcrd validate
+sudo systemctl restart trcrd-master
+```
+
+`The master did not start.` The setup waited up to 45 seconds, and the master
+either stopped or never started listening. The next line is the master's own
+last error. If it says `permission denied` on a file, the `trcr` user can't
+read it, and the setup prints the fix, for example:
+
+```
+The trcr service user cannot read /etc/trcr/license.lic. To fix that and try again:
+  sudo chgrp trcr /etc/trcr/license.lic && sudo chmod 0640 /etc/trcr/license.lic
+  sudo /etc/trcr/finish-setup.sh
+```
+
+`The master is running, but it is not saving results anywhere, so they are
+being thrown away.` The master started, but a results store didn't open. The
+`Its log says:` line quotes the reason, such as a wrong password or a database
+it can't reach. The lines after it say where
+the fix goes: the password in `/etc/trcr/postgres.env`, a password variable in
+`/etc/trcr/master.env` (see
+[A results store's password doesn't reach the master](#a-results-stores-password-doesnt-reach-the-master)),
+or a `backends:` entry in `master.yaml`. Then restart the master and run
+`finish-setup.sh` again.
+
+`The master is running, but the local agent is not.` The agent's log says why:
+run `sudo journalctl -u trcrd-agent -n 30`.
+
 ### `sudo` says `trcrd: command not found`
 
 On RHEL and its relatives, `sudo` doesn't look in `/usr/local/bin`, where
@@ -90,6 +131,23 @@ your database server accepts connections from the master's address. The
 password must be on the first line of the file you gave, and it can't contain
 a quote mark or a backslash.
 
+Without `psql`, the connection is first tried when the master starts. If it
+fails, `finish-setup.sh` ends with `The master is running, but it is not saving
+results anywhere` and quotes the database's error. See
+[The install ends without `You are all set`](#the-install-ends-without-you-are-all-set).
+
+If the installer says `--postgres-dsn has a password in it`, take
+`:PASSWORD` out of the URL and give the password with
+`--postgres-password-file` or `--postgres-password-env` instead.
+
+### A `trcrd` command says `run it with sudo`
+
+Commands such as `trcrd agents`, `trcrd probes` and `trcrd validate` read the
+master's files, which only root and the `trcr` group can read. Run as an
+ordinary user, they stop with a line like
+`trcrd agents: cannot read /etc/trcr/master.yaml (permission denied) — run it with sudo`.
+Put `sudo` in front and run it again.
+
 ## The master
 
 ### The master won't start
@@ -104,12 +162,65 @@ causes:
 | `monitor_limit_exceeded` | More targets in a bundle than your license allows. The message lists every one over the limit. |
 | an unknown key, with a file name | A misspelled or unsupported setting. Configuration is strict, so fix the key it names. |
 | an unknown backend name | A probe's `backends:` names a results store that isn't defined in `master.yaml`. Remove the `backends:` line or fix the name. |
-| `read fragment …: permission denied` | The `trcr` user can't read a file in `conf.d`, usually because it was copied with `cp`. `sudo trcrd validate` prints the exact fix. |
+| `permission denied (trcrd runs as user trcr; fix: …)` | The `trcr` user can't read a configuration or license file, usually because it was copied with `cp`. Run the fix the line gives. See [The master can't read a file](#the-master-cant-read-a-file). |
 | key file permissions | A key file is readable by other users. Run `sudo chmod 600` on the file it names. |
 | address already in use | Another program has port 8443 or 8444, or your health check port. Find it with `sudo ss -ltnp`. |
 
 `sudo trcrd validate` finds most of these without starting anything, and lists
 every problem at once.
+
+### The master can't read a file
+
+The master runs as the `trcr` user, so every file it reads must be readable by
+the `trcr` group. A file copied in with `sudo cp` usually isn't. The master
+then stops at startup, and the error names the file, the user and the fix:
+
+```
+... open /etc/trcr/license.lic: permission denied (trcrd runs as user trcr; fix: sudo chgrp trcr /etc/trcr/license.lic && sudo chmod 0640 /etc/trcr/license.lic)
+```
+
+`sudo trcrd validate` catches this before a restart. It checks
+`master.yaml`, every file in `conf.d` and the license file:
+
+```
+warning: /etc/trcr/license.lic is owned by root:root with mode 0600, which the trcr service user cannot read
+  fix: sudo chgrp trcr /etc/trcr/license.lic && sudo chmod 0640 /etc/trcr/license.lic
+trcrd validate: 1 problem(s); the master would not run correctly
+```
+
+Run the `fix:` command, then start the master with
+`sudo systemctl restart trcrd-master`. To avoid this next time, copy files into
+`/etc/trcr` with `sudo install -o root -g trcr -m 0640` instead of `cp`.
+
+### A results store's password doesn't reach the master
+
+A results store reads its password from the environment variable its `*_env`
+setting names, such as `password_env: TRCR_PG_PASSWORD`. The master's service
+gets that variable from an `EnvironmentFile`. If no such file sets it, the
+master skips that store at startup and logs an `ERROR` with a `fix` field:
+
+```
+{"level":"ERROR","msg":"backend validation failed; skipping","backend":"postgres-main","kind":"postgres","err":"postgres: password_env=\"TRCR_PG_PASSWORD\" is unset or empty ...","fix":"put TRCR_PG_PASSWORD=... in /etc/trcr/master.env (mode 0640, group trcr); trcrd-master reads it through EnvironmentFile=, then restart the master"}
+```
+
+`sudo trcrd validate` warns about the same thing before you restart:
+
+```
+warning: backend "postgres-main" reads its password from $TRCR_PG_PASSWORD, but no EnvironmentFile of trcrd-master sets it; put TRCR_PG_PASSWORD=... in /etc/trcr/master.env (mode 0640, group trcr)
+```
+
+To fix it, put the variable in `/etc/trcr/master.env` and restart the master:
+
+```bash
+sudo install -m 0640 -o root -g trcr /dev/null /etc/trcr/master.env
+sudoedit /etc/trcr/master.env          # TRCR_PG_PASSWORD=your-password
+sudo systemctl restart trcrd-master
+```
+
+If `validate` says the unit has no `EnvironmentFile=` at all, your master's
+service file is older than `master.env`. Add the line it gives with
+`sudo systemctl edit trcrd-master`. See
+[Storing results](backends.md#passwords-and-tokens).
 
 ### The master fails with `203/EXEC` on an SELinux host
 
@@ -145,9 +256,10 @@ Check these, in order:
 2. Are there probes? Run `sudo trcrd probes`. Remember that `_samples.yaml` is
    ignored until you copy it to a name without the underscore, and that the
    master only loads new probes when it restarts.
-3. Did the database password reach the service? Run
-   `sudo systemctl show trcrd-master -p EnvironmentFiles`. It should list your
-   `.env` file, for example `/etc/trcr/postgres.env`.
+3. Did the database password reach the service? Run `sudo trcrd validate`. It
+   warns when no `EnvironmentFile` of the master's service sets the variable
+   your store names. See
+   [A results store's password doesn't reach the master](#a-results-stores-password-doesnt-reach-the-master).
 4. Can the master reach the database? Try the same address, user and password
    with `psql` or `curl` from the master.
 5. Is the results store still `stdout`? Then results are in the journal, not
@@ -166,15 +278,39 @@ the restart. That doesn't mean the master has loaded it.
 
 ### The log says the TRCR API is refusing the license
 
-Your monitoring isn't affected. See
+The master checks in with `api.trcr.dev` about once an hour. After three
+refused check-ins in a row, it logs this `ERROR`:
+
+```
+heartbeat: the TRCR API is refusing this license (<code>: <detail>); monitoring continues unaffected — run `trcrd license status`, and contact support@trcr.dev if the license should be valid
+```
+
+Your monitoring isn't affected. To see the latest check-in, run
+`sudo trcrd license status` and look at the `last heartbeat:` line. It says
+`ok` once a check-in succeeds again. If it still says `refused`, email
+support@trcr.dev with the code and detail. See
 [Licensing](licensing.md#the-masters-log-says-the-trcr-api-is-refusing-the-license).
 
 ## Agents
 
 ### Enrolling an agent fails
 
-The installer prints `This host could not enroll with the master.` A failed
-attempt leaves nothing behind, so you can retry straight away:
+If the installer says `The master already has an agent with this name.`, the
+master still has a record under that name, often from an earlier install of
+the same host. On the **master**, remove it, then run the same join command on
+the agent again:
+
+```bash
+sudo trcrd agents remove <name> --yes
+```
+
+The refused attempt didn't use up the token, so the same command works for the
+rest of its hour. To keep the old record instead, add `--node-id <other-name>`
+to the join command.
+
+Otherwise the installer prints `This host could not enroll with the master.`
+The agent host keeps nothing from a failed attempt, so you can retry straight
+away:
 
 1. Get a fresh command. Each token works once and expires after an hour. Run
    `sudo trcrd enroll-agent` on the master and paste the new command on the
@@ -344,6 +480,13 @@ On an all-in-one host, Grafana listens on 127.0.0.1 only. Use an SSH tunnel
 (`ssh -L 3000:127.0.0.1:3000 <host>`), or run the installer again with
 `--open-grafana`. The admin password is in `/etc/trcr/grafana-admin.env`, and
 `sudo /etc/trcr/finish-setup.sh` shows it again.
+
+### Grafana refuses the right password
+
+After five wrong passwords, Grafana locks the account for five minutes. During
+that time, even the right password gets `Invalid username or password`. Wait
+five minutes, then sign in with the password from
+`/etc/trcr/grafana-admin.env`, copied rather than retyped.
 
 ## License
 
