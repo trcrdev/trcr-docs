@@ -199,7 +199,7 @@ web-02        up      9s ago     8       in 364d
 ```
 
 A new agent should show `up` within a minute. `LAST SEEN` is the agent's most
-recent call to the master; for a healthy agent it stays within about 15
+recent call to the master; for a healthy agent it stays under about 30
 seconds, like the samples above. `PROBES` is how many probes the
 master serves to that agent, including the automatic agent-to-agent pings.
 `CERT EXPIRES` is when its certificate runs out; agents renew it by themselves
