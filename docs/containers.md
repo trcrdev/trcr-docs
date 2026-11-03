@@ -82,8 +82,8 @@ docker compose exec trcr-master cat /run/trcr-secrets/grafana_admin_password
 
 The home dashboard is the TRCR overview; the other sixteen are in the TRCR
 folder. The datasource is already set up and points at the results store.
-On a host with 512 MB of memory Grafana takes about two minutes to show
-its dashboards and pushes the host into swap; leave it out there (see
+On a host with 512 MB of memory Grafana takes about four minutes to show
+all its dashboards and pushes the host into swap; leave it out there (see
 below) or give the host more memory.
 
 ### What the first start did
@@ -243,9 +243,10 @@ docker compose exec trcr-master trcrd probes
 ```
 
 With quadlets: `sudo systemctl restart trcr-master`, which also re-runs
-`trcr-enroll` (it finds the agent enrolled and does nothing); the agent
-keeps running and reconnects. The daemon runs as uid 65532 and must be
-able to read the file, so install it rather than copy it:
+`trcr-enroll`; the first time it removes the agent's used token, and after
+that it finds nothing to do. The agent keeps running and reconnects. The
+daemon runs as uid 65532 and must be able to read the file, so install it
+rather than copy it:
 
 ```bash
 sudo install -o 65532 -g 65532 -m 0640 FILE etc/conf.d/NAME.yaml
