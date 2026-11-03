@@ -287,10 +287,12 @@ To check, search the log back to the master's latest start, so a problem from
 before a restart doesn't show up again:
 
 ```bash
-sudo journalctl -u trcrd-master -r | sed '/master ready/q' | grep -iE "discard|backend"
+sudo journalctl -u trcrd-master -r | sed '/master ready/q' | grep -E "backend ready|backend .*; skipping|backends were skipped|DISCARDED"
 ```
 
-`backend ready` means a store opened; `DISCARDED` means none did.
+`backend ready` means a store opened. `backend open failed; skipping` (or
+`backend validation failed; skipping`) names a store that didn't, and its
+`err` says why. `DISCARDED` means none opened.
 
 On an all-in-one host, `finish-setup.sh` waits up to 90 seconds for the first
 results, and stops waiting about ten seconds after the first row arrives. If
