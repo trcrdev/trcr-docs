@@ -24,6 +24,9 @@ User=0
 DropCapability=ALL
 AddCapability=CHOWN DAC_OVERRIDE FOWNER SETUID SETGID
 NoNewPrivileges=true
+# Output straight to this unit's journal. The default journald driver
+# logs it once more from the attached podman, so every line showed twice.
+LogDriver=passthrough
 EnvironmentFile=/etc/trcr-container/setup.env
 Volume=/etc/trcr:/etc/trcr:z
 Volume=/etc/trcr-container:/setup:ro,z

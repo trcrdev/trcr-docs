@@ -16,6 +16,9 @@ Volume=trcr-master-state.volume:/var/lib/trcr
 Volume=trcr-bootstrap.volume:/run/trcr-bootstrap
 DropCapability=ALL
 NoNewPrivileges=true
+# Output straight to this unit's journal. The default journald driver
+# logs it once more from the attached podman, so every line showed twice.
+LogDriver=passthrough
 
 [Service]
 Type=oneshot
