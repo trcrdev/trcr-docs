@@ -227,9 +227,13 @@ all-in-one host you'll see something like this:
 ==> Upgrade complete: trcrd-master and trcrd-agent are running v26.11.0.
 ```
 
-When you see `Upgrade complete`, you're done. The sample probes line appears
-only when the samples changed. Grafana is restarted only if its TRCR settings
-changed. An upgrade doesn't print a new join command; it says
+When you see `Upgrade complete`, you're done. `Data is flowing` counts only
+results saved since the restarted master started, so it shows the new version
+is writing. The sample probes line appears only when the samples changed.
+Grafana is restarted only if its TRCR settings or dashboards changed, and the
+line says which, for example
+`Restarting Grafana so it loads the new settings ...`. An upgrade doesn't
+print a new join command; it says
 `To add another host, run this here on the master and paste the command it prints on that host:`
 and points at `sudo trcrd enroll-agent`.
 
@@ -287,7 +291,9 @@ for results and the run takes seconds:
 ```
 
 Every run is logged in `/var/log/trcr-install.log`, including the checks that
-`finish-setup.sh` makes on the master.
+`finish-setup.sh` makes on the master. Each run's part of the log ends with
+`=== install.sh exit status N ===`, where 0 means the run finished without an
+error.
 
 After upgrading:
 
