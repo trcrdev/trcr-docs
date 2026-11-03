@@ -239,9 +239,21 @@ have.
 
 ## Day-to-day operations
 
-**Changing probes.** Edit or add files under `etc/conf.d/`, then restart the
-master; it reads its configuration once at startup, so there is no hot
-reload:
+**Changing probes.** Edit or add files under `etc/conf.d/`
+(`/etc/trcr/conf.d/` with quadlets). Each file holds a list of probes;
+`_samples.yaml` there shows every probe type, and files whose names start
+with `_` are skipped. A minimal one:
+
+```yaml
+probes:
+  - name: office-website
+    type: http
+    url: https://www.example.com
+    interval: 1m
+```
+
+Then restart the master; it reads its configuration once at startup, so
+there is no hot reload:
 
 ```bash
 docker compose restart trcr-master
@@ -250,9 +262,18 @@ docker compose exec trcr-master trcrd probes
 
 With quadlets: `sudo systemctl restart trcr-master`, which also re-runs
 `trcr-enroll`; the first time it removes the agent's used token, and after
-that it finds nothing to do. The agent keeps running and reconnects. The
-daemon runs as uid 65532 and must be able to read the file, so install it
-rather than copy it:
+that it finds nothing to do. The agent keeps running and reconnects.
+`trcrd probes` lists what the files say, not what the agents run; the
+agent's log (`docker compose logs trcr-agent-1`, `sudo journalctl -u
+trcr-agent`) shows the change arrive within a minute, with a new `revision`:
+
+```
+{"time":"2026-11-03T04:02:26.889285345Z","level":"INFO","msg":"probe config applied","revision":2,"probe_count":8,"probe_count_unfiltered":8}
+```
+
+The daemon runs as uid 65532 and must be able to read the file, so install
+it rather than copy it (on a Mac, see below; with quadlets the target is
+`/etc/trcr/conf.d/NAME.yaml`):
 
 ```bash
 sudo install -o 65532 -g 65532 -m 0640 FILE etc/conf.d/NAME.yaml
@@ -341,7 +362,9 @@ puts the agent in Docker Desktop's Linux VM, not on your Mac, so its
 latency and traceroute are measured from that VM (usually `192.168.65.x`);
 fine for trying TRCR, not for measuring the Mac's own connection. And the
 bind-mounted `etc/` shows up owned by your macOS user, not uid 65532; that
-is Docker Desktop's file sharing, and nothing needs changing.
+is Docker Desktop's file sharing, and nothing needs changing. To add a
+probe file, `install -m 0640 FILE etc/conf.d/NAME.yaml` without `sudo` or
+an owner is enough; the container reads it through that sharing.
 
 > **Note:** On a laptop that sleeps, agents elsewhere will report the master
 > as down while the lid is closed. Run a production master on a server.
