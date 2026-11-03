@@ -194,20 +194,24 @@ refreshes `/etc/trcr/examples/` and the sample probes, and restarts the TRCR
 services that were running, so they run the new version. Your configuration,
 license and data are left alone, and there's nothing to restart by hand.
 
-On the **master**, use the options you installed with. On an all-in-one host,
-that's `--all-in-one`, which also brings the TRCR dashboards up to date:
+On the **master**, run the plain command:
+
+```bash
+curl -fsSL https://trcr.dev/install/install.sh | sh
+```
+
+With no options, the installer keeps the way the master was set up. An
+all-in-one host is upgraded as one, TRCR dashboards included, and stays
+reachable the way it was (`--open-grafana` or not). A master on your own
+PostgreSQL keeps using it, with the address and password it already has.
+The options you installed with work too, for example:
 
 ```bash
 curl -fsSL https://trcr.dev/install/install.sh | sh -s -- --all-in-one
 ```
 
 You can leave out `--email`, `--company` and `--license`; once a license is
-installed, the installer uses it. A master you set up with no options takes the
-plain command:
-
-```bash
-curl -fsSL https://trcr.dev/install/install.sh | sh
-```
+installed, the installer uses it.
 
 The master is restarted first. Once it's listening again, the local agent is
 restarted, and only then does the installer check that everything works. On an
@@ -276,9 +280,11 @@ You'll see:
 If `trcrd` was already up to date, the installer says
 `trcrd v26.11.0 is already installed and up to date.` and restarts nothing. On
 an agent, it adds `This host is an agent (enrolled as <name>); nothing else to do here.`
-On an all-in-one master where everything is running, it checks the services
-and the master's log instead of running the full setup, so there's no wait
-for results and the run takes seconds:
+On an all-in-one master, or one on your own PostgreSQL, where everything is
+running, it checks the services and the master's log instead of running the
+full setup, so there's no wait for results and the run takes seconds. That's
+the same with the plain command and with the options you installed with. On
+an all-in-one host you'll see:
 
 ```
 ==> trcrd v26.11.0 is already installed and up to date.
@@ -297,6 +303,10 @@ for results and the run takes seconds:
     To add another host:  sudo trcrd enroll-agent     # run here; paste the command it prints on that host
     Check on things:      sudo trcrd agents, sudo trcrd probes
 ```
+
+The `Probes` line grows as agents join, because the master adds automatic
+agent-to-agent pings between them. With other agents it reads like
+`7 in /etc/trcr/conf.d/ + 6 automatic agent-to-agent; change the ones in conf.d/ whenever you like`.
 
 Every run is logged in `/var/log/trcr-install.log`, including the checks that
 `finish-setup.sh` makes on the master. Each run's part of the log ends with

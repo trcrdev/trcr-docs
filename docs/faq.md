@@ -13,10 +13,14 @@ add the store yourself. See [Install TRCR](install.md).
 
 Yes. That's how you upgrade, on the master and on agents alike. It replaces
 `trcrd`, restarts the TRCR services that were running if the version changed,
-and leaves your configuration, license and data alone. When it's done, it says
+and leaves your configuration, license and data alone. With no options, it
+keeps the way the host was set up, so on an all-in-one host the plain command
+brings Grafana's TRCR dashboards up to date too. When it's done, it says
 `Upgrade complete`. If there was nothing to upgrade and everything is running,
-it says `Nothing to do: trcrd v26.11.0 is installed and everything is running.`
-within seconds. See [Operations](operations.md#upgrade-trcr).
+an all-in-one master, or one on your own PostgreSQL, says
+`Nothing to do: trcrd v26.11.0 is installed and everything is running.`
+within seconds, with or without options. See
+[Operations](operations.md#upgrade-trcr).
 
 ### Why did the install finish with nothing running?
 

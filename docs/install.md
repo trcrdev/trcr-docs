@@ -609,9 +609,12 @@ The installer changes the host firewall only when you give `--open-firewall`.
 
 You can run the installer as often as you like. Running it again upgrades
 `trcrd`, restarts the TRCR services that were running, and leaves your
-configuration, license and data alone. A run with nothing to upgrade and
-everything running takes seconds and says
-`Nothing to do: trcrd v26.11.0 is installed and everything is running.` See
+configuration, license and data alone. With no options, it keeps the way the
+host was set up: an all-in-one host stays all-in-one, Grafana included, and
+a master on your own PostgreSQL keeps using it. On either of those, a run
+with nothing to upgrade and everything running takes seconds and says
+`Nothing to do: trcrd v26.11.0 is installed and everything is running.`,
+whether you give the options you installed with or none. See
 [Operations](operations.md#upgrade-trcr).
 
 ### How the installer protects you
