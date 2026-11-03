@@ -340,7 +340,14 @@ dashboards to the ones shipped with that release, and the probe samples too:
 
 ```
 trcr-init: refreshed /etc/trcr/conf.d/_samples.yaml (probe samples for this release)
+trcr-init: done.
 ```
+
+When the release brings new dashboards,
+`trcr-init: Grafana: 17 dashboards and the datasource are set up` comes
+before `done.`. The Grafana address and the command that shows its password
+come only at the end of the first start, written for the stack it runs in
+(`docker compose exec`, `sudo podman-compose exec` or `sudo podman exec`).
 
 **Checking.** The master's CLI works through `exec` as it does on a host:
 
@@ -364,7 +371,9 @@ belongs to uid 65532, so copy it with `sudo`), remove `etc/` as well, and put
 the copy back as `etc/license.lic` before `docker compose up -d`. Otherwise
 the first start installs `license.lic` from next to `compose.yml` if it's
 still there, or, with `TRCR_LICENSE_EMAIL` in `.env`, requests a new license
-by email.
+by email. On an agent host of its own, run it where `compose.agent.yml` is:
+`docker compose -f compose.agent.yml down -v` (with podman-compose,
+`sudo podman-compose -f compose.agent.yml down -v`).
 
 With quadlets, stop every `trcr-` unit, including the volume and network
 units Quadlet generated so that a later install creates the volumes again,
@@ -385,6 +394,11 @@ in `/etc/trcr-container`. If your license came by email, it's only in
 `/etc/trcr`, so copy `/etc/trcr/license.lic` to
 `/etc/trcr-container/license.lic` first. On a remote agent, remove just the two
 `trcr-agent-*` volumes; there is no network.
+
+After `trcrd agents remove` or `agents revoke`, a master in a container
+prints these remote-agent commands, for Compose and for quadlets, so you can
+clean up the agent's host too. For an agent installed directly on a host, it
+gives `sudo trcrd leave --local-only --yes` to run there instead.
 
 ## macOS and Docker Desktop
 
