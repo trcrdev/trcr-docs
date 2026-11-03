@@ -240,9 +240,13 @@ have.
 ## Day-to-day operations
 
 **Changing probes.** Edit or add files under `etc/conf.d/`
-(`/etc/trcr/conf.d/` with quadlets). Each file holds a list of probes;
-`_samples.yaml` there shows every probe type, and files whose names start
-with `_` are skipped. A minimal one:
+(`/etc/trcr/conf.d/` with quadlets). Each file holds a list of probes, and
+files whose names start with `_` are skipped. `_samples.yaml` there has a
+sample of every probe type: the ones that work against public targets are
+live, and the ones that need your own data (throughput between two agents,
+batch ping, SNMP, BGP and DNS propagation) are commented out. It's rewritten
+for every release, so don't edit it; copy it to an active name (see below)
+and edit the copy. A minimal file:
 
 ```yaml
 probes:

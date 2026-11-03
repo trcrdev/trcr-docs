@@ -576,7 +576,8 @@ Every Linux install:
 - Writes `/etc/trcr/master.yaml`, the example probes in
   `/etc/trcr/conf.d/_samples.yaml`, and annotated reference copies of every
   example configuration in `/etc/trcr/examples/`. Existing files are never
-  overwritten. The examples are refreshed on every upgrade.
+  overwritten, except `_samples.yaml` and the examples, which are refreshed
+  for every release. Edit a copy of them, not the files themselves.
 - Installs the `trcrd-master` service and `/etc/trcr/finish-setup.sh`, the
   script that starts the master and enrolls a local agent once a license is in
   place.

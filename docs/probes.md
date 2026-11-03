@@ -10,8 +10,11 @@ them as the reference for each type's options.
 
 ## Write your first probes
 
-The quickest start is the sample file the installer wrote. Copy it to an
-active name, so the master reads it, and edit the targets:
+The quickest start is the sample file the installer wrote, which has a sample
+of every probe type. The ones that need your own data, such as your switches
+or your domain, are commented out. The file is rewritten for every release,
+so edits to it are lost. Copy it to an active name, so the master reads it,
+and edit the copy:
 
 ```bash
 sudo install -o root -g trcr -m 0640 /etc/trcr/conf.d/_samples.yaml /etc/trcr/conf.d/probes.yaml
