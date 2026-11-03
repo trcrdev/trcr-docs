@@ -98,8 +98,9 @@ Three things matter:
   another host. Copy it now. It's also kept in `/etc/trcr/grafana-admin.env`.
 
 On a small host, Grafana may still be starting when the install ends. The
-installer then says `Grafana is still starting; it will be ready in a minute or two.`
-Give it that long before you open it.
+installer then says `Grafana is still starting; it will be ready in a minute or two.`,
+and says `Still starting; it will be ready in a minute or two.` again under
+the Grafana address at the end. Give it that long before you open it.
 
 Where the `ssh -L` command says `<this-host>`, put in the name or address you
 use to reach the host over SSH. The summary fills in the host's own address

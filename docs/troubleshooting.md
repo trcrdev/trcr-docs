@@ -564,8 +564,9 @@ On an all-in-one host, Grafana listens on 127.0.0.1 only. Use an SSH tunnel
 `sudo /etc/trcr/finish-setup.sh` shows it again.
 
 Grafana's first start can take a minute or two, longer on a small host. If
-the install ended with `Grafana is still starting; it will be ready in a minute or two.`,
-wait that long. `sudo systemctl status grafana-server` says `activating`
+the install said `Grafana is still starting; it will be ready in a minute or two.`,
+or `Still starting; it will be ready in a minute or two.` under the Grafana
+address at the end, wait that long. `sudo systemctl status grafana-server` says `activating`
 while it's still starting. Only if the install warned
 `could not start grafana-server` is something wrong; the
 `journalctl -u grafana-server -n 30` command in that warning shows why.
