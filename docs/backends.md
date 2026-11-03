@@ -46,10 +46,13 @@ service reads it when it starts.
 To add or change a secret, run this on the **master**:
 
 ```bash
-sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
+sudo nano /etc/trcr/master.env         # add TRCR_PG_PASSWORD=your-password
 sudo trcrd validate
 sudo systemctl restart trcrd-master
 ```
+
+Any editor works, as long as you run it as root. Editing the file in place
+keeps its owner and permissions.
 
 `validate` checks that every variable your stores name is set by a file the
 master's service reads. If one isn't, it says which variable and which file to

@@ -15,7 +15,7 @@ active name, so the master reads it, and edit the targets:
 
 ```bash
 sudo install -o root -g trcr -m 0640 /etc/trcr/conf.d/_samples.yaml /etc/trcr/conf.d/probes.yaml
-sudoedit /etc/trcr/conf.d/probes.yaml
+sudo nano /etc/trcr/conf.d/probes.yaml
 ```
 
 Or write your own file. Here's a small one with the most common types:

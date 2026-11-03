@@ -75,7 +75,7 @@ from: `password_env`, `token_env`, `api_key_env`, `url_env`,
 by root and the `trcr` group only:
 
 ```bash
-sudoedit /etc/trcr/master.env          # NAME=value, one per line
+sudo nano /etc/trcr/master.env         # NAME=value, one per line
 sudo chgrp trcr /etc/trcr/master.env && sudo chmod 0640 /etc/trcr/master.env
 sudo trcrd validate
 ```

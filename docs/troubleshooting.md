@@ -254,7 +254,7 @@ installer creates that file with the right permissions, so there's nothing to
 `chmod`:
 
 ```bash
-sudoedit /etc/trcr/master.env          # add TRCR_PG_PASSWORD=your-password
+sudo nano /etc/trcr/master.env         # add TRCR_PG_PASSWORD=your-password
 sudo systemctl restart trcrd-master
 ```
 
