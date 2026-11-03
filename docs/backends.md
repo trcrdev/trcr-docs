@@ -1,8 +1,16 @@
 # Storing results
 
-The master writes every result to the stores listed under `backends:` in
+Most people keep their results in PostgreSQL, and the TRCR dashboards are
+built for it. This page helps you choose a store and shows how to set each one
+up.
+
+The master writes every result to every store listed under `backends:` in
 `/etc/trcr/master.yaml`. Stores are free in every tier, and you can use several
-at once. `trcrd init` writes a commented example of each into `master.yaml`.
+at once. The installer writes a commented example of each into `master.yaml`.
+
+The all-in-one install and the installer's `--postgres-dsn` option set up a
+PostgreSQL store for you (see [Install TRCR](install.md)). Read on to set up a
+store by hand, or to add a second one.
 
 | Type | Use it for |
 |---|---|
@@ -13,20 +21,25 @@ at once. `trcrd init` writes a commented example of each into `master.yaml`.
 | `file` | Writing results to a local file, for a log shipper or a host with no network access. |
 | `stdout` | Printing results. For a first look and for debugging only. |
 
-One store failing never stops the master or the other stores. A store that
-cannot be opened is skipped with an error in the log, and the master carries
-on. **That means a master can run and store nothing**, so check the log after
-changing this section:
+If a results store fails, TRCR keeps running and writes to the others, so one
+broken database can't stop your monitoring. The catch is that a master can
+look healthy while saving nothing at all. After you change this section,
+restart the master and check the log:
 
 ```bash
 sudo journalctl -u trcrd-master | grep -iE "backend|discard"
 ```
 
+Each store that opened logs `backend ready`. If none did, you'll see an error
+saying every probe result will be DISCARDED, after the error that explains why
+each store failed.
+
 ## Passwords and tokens
 
-Never put a password or token in `master.yaml`. Each store reads its secret
-from an environment variable that you name with a `*_env` setting. Supply the
-variable through a systemd drop-in that points at a protected file:
+Keep passwords and tokens out of `master.yaml`. Each store reads its secret
+from an environment variable that you name with a `*_env` setting. To supply
+the variable, put it in a file only root and the `trcr` group can read, and
+point the master's service at it with a systemd drop-in:
 
 ```bash
 sudo install -m 0640 -o root -g trcr /dev/null /etc/trcr/postgres.env
@@ -39,7 +52,7 @@ sudo systemctl edit trcrd-master
 EnvironmentFile=/etc/trcr/postgres.env
 ```
 
-The all-in-one install does exactly this for you.
+The all-in-one install and `--postgres-dsn` do exactly this for you.
 
 ## PostgreSQL
 
@@ -60,7 +73,7 @@ backends:
 
 - Create an empty database and a user that owns it. With
   `auto_create_tables: true`, TRCR creates and maintains everything it needs
-  inside that database, including new partitions. There is no migration step
+  inside that database, including new partitions. There's no migration step
   when you upgrade.
 - Data is partitioned by month and kept for 12 months unless you change
   `retention_months`. Old partitions are dropped automatically.
@@ -75,10 +88,11 @@ backends:
       compression_after: 7d    # 0 never compresses
 ```
 
-The TimescaleDB extension must already be installed in the database. If the
-configuration says it is enabled and the extension is missing, this store will
-not open. When TimescaleDB is on, the `partitioning:` block is ignored. The
-installer's `--timescaledb` option sets all of this up.
+Install the TimescaleDB extension in the database first. If the configuration
+says TimescaleDB is enabled and the extension is missing, this store won't
+open. When TimescaleDB is on, the `partitioning:` block is ignored. On an
+all-in-one install, the installer's `--timescaledb` option sets all of this
+up.
 
 ## InfluxDB v2
 
@@ -128,8 +142,8 @@ backends:
     expire_after: 15m
 ```
 
-This is not a store. It shows the **latest** result of each probe for
-Prometheus to scrape, and Prometheus keeps the history.
+This one works differently from the others. It shows the latest result of
+each probe for Prometheus to scrape, and Prometheus keeps the history.
 
 - Only the probe labels in `label_allowlist` become Prometheus labels. Leave it
   empty for none. This keeps the number of series under control.
@@ -137,8 +151,8 @@ Prometheus to scrape, and Prometheus keeps the history.
   all of them.
 - A probe that stops reporting disappears after `expire_after`.
 
-Do not confuse this with the master's own health metrics on port 9101, which
-describe TRCR itself. See [Operations](operations.md#metrics).
+It's separate from the master's own metrics on port 9101, which describe TRCR
+itself. See [Operations](operations.md#metrics).
 
 ## File and standard output
 
@@ -159,13 +173,14 @@ The file store appends one JSON object per line. The service may only write
 under `/var/log/trcr` and `/var/lib/trcr`, so keep the file in one of those.
 
 With `stdout`, results go to the journal: `sudo journalctl -fu trcrd-master`.
-The starter configuration uses it so that a new install shows something
-straight away. Replace it before you rely on the data.
+A master installed with no options uses it, so you can see results straight
+away. Replace it before you rely on the data.
 
 ## If the master is down
 
-Agents send results as they are produced. While the master cannot be reached,
-results from that period are not kept. Agents carry on probing and start
-sending again when the master returns. Plan the master's host accordingly.
+Agents send results as they're produced and don't store them. While the master
+can't be reached, results from that period are lost. Agents carry on probing
+and start sending again when the master returns, so put the master on a host
+you can keep running.
 
-Next: [Alerting](alerting.md).
+Next, get told when something breaks: [Alerting](alerting.md).
