@@ -83,14 +83,46 @@ We review paid requests before issuing a license. Until it's ready,
 `trcrd license claim` exits with status 3; once it's issued, the same command
 installs it. We also email you the license file.
 
+## Install a license file
+
+If you have the license as a file, install it on the master so the `trcr`
+user can read it, then restart the master:
+
+```bash
+sudo install -o root -g trcr -m 0640 license.lic /etc/trcr/license.lic
+sudo systemctl restart trcrd-master
+```
+
+Use `install` rather than `cp`. A copy made with `sudo cp` is readable by root
+only, and the master, which runs as the `trcr` user, then won't start. If that
+happens, its log names the file and gives the `chgrp` and `chmod` that fix it.
+
 ## Check your license
 
-To see the installed license, any renewed copy and any request that's still
-waiting, run:
+To see the installed license, any renewed copy, the master's last check-in and
+any request that's still waiting, run:
 
 ```bash
 sudo trcrd license status
 ```
+
+You'll see something like this:
+
+```
+installed license: /etc/trcr/license.lic (id=… tier=free expires=…)
+last heartbeat:    2026-11-03 02:11 UTC — ok
+```
+
+The `last heartbeat:` line is the outcome of the master's most recent check-in
+with `api.trcr.dev`:
+
+| It says | What it means |
+|---|---|
+| `ok` | The check-in worked. |
+| `refused (<code>: <detail>)` | The TRCR API refused the license. See [below](#the-masters-log-says-the-trcr-api-is-refusing-the-license). |
+| `failed (…)` | The check-in didn't get through, for example because of the network. The master keeps trying. |
+| `none recorded yet` | The master hasn't checked in since it last started on this version. The first check-in happens soon after it starts. |
+| `never attempted (heartbeat disabled)` | Check-ins are turned off in `master.yaml`. |
 
 ## Renewal
 
@@ -146,12 +178,14 @@ The line looks like this:
 heartbeat: the TRCR API is refusing this license (<code>: <detail>); monitoring continues unaffected — run `trcrd license status`, and contact support@trcr.dev if the license should be valid
 ```
 
-Your monitoring isn't affected. Run `sudo trcrd license status`, and if the
-license should be valid, email support@trcr.dev with the code and detail from
-that line.
+The master logs it after three refused check-ins in a row. Your monitoring
+isn't affected. Run `sudo trcrd license status` and look at the
+`last heartbeat:` line. If it says `refused` and the license should be valid,
+email support@trcr.dev with the code and detail it shows.
 
 ### Move a license to another host
 
-Copy `/etc/trcr/license.lic` to the new master, or request it again with the
-same email address. Before you uninstall with `--purge`, keep a copy of the
+Copy `/etc/trcr/license.lic` to the new master and install it there as shown
+in [Install a license file](#install-a-license-file), or request it again with
+the same email address. Before you uninstall with `--purge`, keep a copy of the
 file somewhere safe.
