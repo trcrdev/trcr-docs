@@ -79,7 +79,9 @@ follows the same three steps:
 status 1. When there's nothing wrong, it prints `config OK: …`, and
 `license OK: …` if a license file is installed. It adds
 `Restart the master to apply changes: sudo systemctl restart trcrd-master`
-only when a file changed after the running master started. See
+only when a file changed after the running master started; on a fresh
+install, or when the master already runs what's on disk, there's no such
+line. See
 [Configuration](configuration.md#check-before-you-restart) for what each line
 means.
 
@@ -117,7 +119,7 @@ you're most likely to meet:
 | `backend validation failed; skipping` (ERROR) | One results store wasn't started. The `err` field says why. If its password variable isn't set, the `fix` field says where to put it. See [Troubleshooting](troubleshooting.md#a-results-stores-password-doesnt-reach-the-master). |
 | `some backends were skipped` (WARN) | One of several results stores didn't open. The others are still saving. |
 | `master.advertise_addr is not set` (WARN) | Agents on other hosts will enroll and then fail. See [Configuration](configuration.md#advertise_addr-is-required-for-remote-agents). |
-| `tightened directory permissions (world bits removed)` (WARN) | The master found one of its folders readable by every user and fixed it. You'll see it once; there's nothing to do. |
+| `tightened directory permissions (world bits removed)` (WARN) | The master found one of its folders readable by every user and fixed it. You'll see it once, including once after an upgrade from an older release; there's nothing to do. |
 | `heartbeat send failed` (WARN) | The master couldn't check in with `api.trcr.dev`. Monitoring carries on, and the master keeps trying. |
 | `heartbeat: the TRCR API is refusing this license` (ERROR) | Three check-ins in a row were refused. Monitoring carries on. `sudo trcrd license status` shows the latest outcome. See [Licensing](licensing.md#the-masters-log-says-the-trcr-api-is-refusing-the-license). |
 | `license renewed via heartbeat; restart to apply` (INFO) | A renewed license is waiting. Restart the master when it suits you. |
@@ -227,7 +229,20 @@ all-in-one host you'll see something like this:
 
 When you see `Upgrade complete`, you're done. The sample probes line appears
 only when the samples changed. Grafana is restarted only if its TRCR settings
-changed.
+changed. An upgrade doesn't print a new join command; it says
+`To add another host, run this here on the master and paste the command it prints on that host:`
+and points at `sudo trcrd enroll-agent`.
+
+If the master's service file came from an older release, the installer keeps
+it and adds a drop-in with the two settings newer service files carry, before
+the restart:
+
+```
+==> Added /etc/systemd/system/trcrd-master.service.d/10-trcr.conf so the kept service file reads /etc/trcr/master.env.
+```
+
+You may see `tightened directory permissions` once in the master's log after
+that restart; see [What a healthy master log looks like](#what-a-healthy-master-log-looks-like).
 
 On each **agent**, run the plain command. The installer sees that the host is
 an agent and upgrades it, without writing any master configuration:
@@ -249,6 +264,27 @@ You'll see:
 If `trcrd` was already up to date, the installer says
 `trcrd v26.11.0 is already installed and up to date.` and restarts nothing. On
 an agent, it adds `This host is an agent (enrolled as <name>); nothing else to do here.`
+On an all-in-one master where everything is running, it checks the services
+and the master's log instead of running the full setup, so there's no wait
+for results and the run takes seconds:
+
+```
+==> trcrd v26.11.0 is already installed and up to date.
+...
+==> Nothing to do: trcrd v26.11.0 is installed and everything is running.
+
+  What is on this host now:
+    PostgreSQL   database trcr_results on this host only (127.0.0.1:5432); password in /etc/trcr/postgres.env
+    Grafana      Only reachable from this host. From your own computer, run:
+                   ssh -L 3000:127.0.0.1:3000 <this-host>
+                 then open http://localhost:3000 and look in the TRCR folder.
+                 Sign in as admin / <password>  (also in /etc/trcr/grafana-admin.env)
+                 To reach it directly instead, run the installer again with --open-grafana.
+    Probes       7 starter probes in /etc/trcr/conf.d/standalone.yaml; change them whenever you like
+
+    To add another host:  sudo trcrd enroll-agent     # run here; paste the command it prints on that host
+    Check on things:      sudo trcrd agents, sudo trcrd probes
+```
 
 Every run is logged in `/var/log/trcr-install.log`, including the checks that
 `finish-setup.sh` makes on the master.
